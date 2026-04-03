@@ -22,9 +22,9 @@ BEGIN
         ORDER  BY member_id
     ) LOOP
         DBMS_OUTPUT.PUT_LINE(
-            'Member : ' || m.name ||
-            ' (ID: '    || m.member_id ||
-            ' | Status: '|| m.status || ')'
+            'Member : ' || RPAD(m.name, 20) ||
+            ' (ID: '    || RPAD(m.member_id, 3) ||
+            ' | Status: '|| RPAD(m.status, 10) || ')'
         );
 
         v_subtotal := 0;
@@ -43,11 +43,11 @@ BEGIN
             ORDER  BY o.order_date
         ) LOOP
             DBMS_OUTPUT.PUT_LINE(
-                '   Order #'  || o.order_id                            ||
+                '   Order #'  || RPAD(o.order_id, 4)                            ||
                 ' | '         || TO_CHAR(o.order_date, 'DD-Mon-YYYY') ||
                 ' | '         || RPAD(o.restaurant_name, 20)          ||
-                ' | RM '      || TO_CHAR(o.amount, 'FM999,999.00')    ||
-                ' | '         || o.order_status
+                ' | RM '      || LPAD(TO_CHAR(o.amount, 'FM999,999.00'), 9)    ||
+                ' | '         || RPAD(o.order_status, 15)
             );
             v_subtotal     := v_subtotal + o.amount;
             v_grand_orders := v_grand_orders + 1;
@@ -63,7 +63,7 @@ BEGIN
 
     DBMS_OUTPUT.PUT_LINE('========================================');
     DBMS_OUTPUT.PUT_LINE(
-        'GRAND TOTAL — Orders: ' || v_grand_orders ||
+        'GRAND TOTAL - Orders: ' || v_grand_orders ||
         '   Revenue: RM '        || TO_CHAR(v_grand_total, 'FM999,999.00')
     );
     DBMS_OUTPUT.PUT_LINE('========================================');

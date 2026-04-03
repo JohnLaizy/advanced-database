@@ -1,0 +1,1198 @@
+set pagesize 120;
+set linesize 200;
+
+CREATE TABLE membership_type (
+    membership_type_id  NUMBER          NOT NULL,
+    type_name           VARCHAR2(20)    NOT NULL,
+    monthly_fee         NUMBER(5,2)     DEFAULT 0.00 NOT NULL,
+    description         VARCHAR2(4000),
+    CONSTRAINT pk_membership_type PRIMARY KEY (membership_type_id)
+);
+
+CREATE TABLE member (
+    member_id           NUMBER          NOT NULL,
+    name                VARCHAR2(100)   NOT NULL,
+    email               VARCHAR2(150)   NOT NULL,
+    contact             VARCHAR2(20),
+    password_hash       VARCHAR2(255)   NOT NULL,
+    registration_date   DATE            DEFAULT SYSDATE NOT NULL,
+    status              VARCHAR2(20)    DEFAULT 'active' NOT NULL,
+    membership_type_id  NUMBER,
+    CONSTRAINT pk_member            PRIMARY KEY (member_id),
+    CONSTRAINT uq_member_email      UNIQUE (email),
+    CONSTRAINT chk_member_status    CHECK (status IN ('active', 'suspended', 'deleted')),
+    CONSTRAINT fk_member_mtype      FOREIGN KEY (membership_type_id)
+        REFERENCES membership_type (membership_type_id)
+        ON DELETE SET NULL
+);
+
+CREATE TABLE delivery_address (
+    delivery_address_id NUMBER          NOT NULL,
+    address             VARCHAR2(255)   NOT NULL,
+    contact_person      VARCHAR2(100),
+    contact_no          VARCHAR2(20),
+    member_id           NUMBER          NOT NULL,
+    CONSTRAINT pk_delivery_address  PRIMARY KEY (delivery_address_id),
+    CONSTRAINT fk_daddr_member      FOREIGN KEY (member_id)
+        REFERENCES member (member_id)
+        ON DELETE CASCADE
+);
+
+CREATE TABLE restaurants (
+    restaurant_id       NUMBER          NOT NULL,
+    name                VARCHAR2(150)   NOT NULL,
+    location            VARCHAR2(255)   NOT NULL,
+    contact_num         VARCHAR2(20)    NOT NULL,
+    category            VARCHAR2(20)    NOT NULL,
+    rating              NUMBER(3,2),
+    CONSTRAINT pk_restaurants       PRIMARY KEY (restaurant_id),
+    CONSTRAINT chk_rest_category    CHECK (category IN ('Halal', 'Non-Halal'))
+);
+
+CREATE TABLE menu (
+    menu_id             NUMBER          NOT NULL,
+    item_name           VARCHAR2(150)   NOT NULL,
+    description         VARCHAR2(4000)  NOT NULL,
+    price               NUMBER(10,2)    NOT NULL,
+    is_available        NUMBER(1)       DEFAULT 1 NOT NULL,
+    type                VARCHAR2(10)    NOT NULL,
+    is_budget_meal      NUMBER(1)       DEFAULT 0 NOT NULL,
+    is_super_deal       NUMBER(1)       DEFAULT 0 NOT NULL,
+    restaurant_id       NUMBER          NOT NULL,
+    CONSTRAINT pk_menu              PRIMARY KEY (menu_id),
+    CONSTRAINT chk_menu_type        CHECK (type IN ('Food', 'Drink')),
+    CONSTRAINT chk_menu_avail       CHECK (is_available IN (0, 1)),
+    CONSTRAINT chk_menu_budget      CHECK (is_budget_meal IN (0, 1)),
+    CONSTRAINT chk_menu_super       CHECK (is_super_deal IN (0, 1)),
+    CONSTRAINT fk_menu_restaurant   FOREIGN KEY (restaurant_id)
+        REFERENCES restaurants (restaurant_id)
+        ON DELETE CASCADE
+);
+
+CREATE TABLE voucher (
+    voucher_id          NUMBER          NOT NULL,
+    voucher_code        VARCHAR2(50)    NOT NULL,
+    voucher_type        VARCHAR2(20)    NOT NULL,
+    value               NUMBER(10,2)    NOT NULL,
+    minimum_spend       NUMBER(10,2)    DEFAULT 0.00 NOT NULL,
+    start_date          DATE            NOT NULL,
+    end_date            DATE            NOT NULL,
+    membership_required VARCHAR2(10)    DEFAULT 'Both' NOT NULL,
+    status              VARCHAR2(10)    DEFAULT 'Active' NOT NULL,
+    CONSTRAINT pk_voucher           PRIMARY KEY (voucher_id),
+    CONSTRAINT uq_voucher_code      UNIQUE (voucher_code),
+    CONSTRAINT chk_voucher_type     CHECK (voucher_type IN ('Discount', 'Free Delivery')),
+    CONSTRAINT chk_voucher_memreq   CHECK (membership_required IN ('Normal', 'VIP', 'Both')),
+    CONSTRAINT chk_voucher_status   CHECK (status IN ('Active', 'Inactive', 'Expired'))
+);
+
+CREATE TABLE orders (
+    order_id            NUMBER          NOT NULL,
+    amount              NUMBER(10,2)    NOT NULL,
+    order_date          DATE            DEFAULT SYSDATE NOT NULL,
+    order_status        VARCHAR2(30)    NOT NULL,
+    order_type          VARCHAR2(10)    NOT NULL,
+    restaurant_id       NUMBER          NOT NULL,
+    member_id           NUMBER          NOT NULL,
+    CONSTRAINT pk_orders            PRIMARY KEY (order_id),
+    CONSTRAINT chk_order_type       CHECK (order_type IN ('Delivery', 'Dine-In')),
+    CONSTRAINT fk_orders_restaurant FOREIGN KEY (restaurant_id)
+        REFERENCES restaurants (restaurant_id),
+    CONSTRAINT fk_orders_member     FOREIGN KEY (member_id)
+        REFERENCES member (member_id)
+);
+
+CREATE TABLE voucher_redemption (
+    redemption_id       NUMBER          NOT NULL,
+    redeemed_at         DATE            DEFAULT SYSDATE NOT NULL,
+    discount_applied    NUMBER(10,2)    DEFAULT 0.00 NOT NULL,
+    status              VARCHAR2(10)    DEFAULT 'Pending' NOT NULL,
+    order_id            NUMBER          NOT NULL,
+    voucher_id          NUMBER          NOT NULL,
+    member_id           NUMBER          NOT NULL,
+    CONSTRAINT pk_voucher_redemption PRIMARY KEY (redemption_id),
+    CONSTRAINT uq_vr_order           UNIQUE (order_id),
+    CONSTRAINT chk_vr_status         CHECK (status IN ('Pending', 'Applied', 'Failed')),
+    CONSTRAINT fk_vr_order           FOREIGN KEY (order_id)
+        REFERENCES orders (order_id)
+        ON DELETE CASCADE,
+    CONSTRAINT fk_vr_voucher         FOREIGN KEY (voucher_id)
+        REFERENCES voucher (voucher_id),
+    CONSTRAINT fk_vr_member          FOREIGN KEY (member_id)
+        REFERENCES member (member_id)
+);
+
+CREATE TABLE order_details (
+    order_detail_id     NUMBER          NOT NULL,
+    quantity            NUMBER(10)      DEFAULT 1 NOT NULL,
+    subtotal            NUMBER(10,2)    NOT NULL,
+    order_id            NUMBER          NOT NULL,
+    menu_id             NUMBER          NOT NULL,
+    CONSTRAINT pk_order_details     PRIMARY KEY (order_detail_id),
+    CONSTRAINT fk_od_order          FOREIGN KEY (order_id)
+        REFERENCES orders (order_id)
+        ON DELETE CASCADE,
+    CONSTRAINT fk_od_menu           FOREIGN KEY (menu_id)
+        REFERENCES menu (menu_id)
+);
+
+CREATE TABLE delivery_company (
+    company_id          NUMBER          NOT NULL,
+    company_name        VARCHAR2(150)   NOT NULL,
+    contact_no          VARCHAR2(20),
+    service_type        VARCHAR2(10)    NOT NULL,
+    CONSTRAINT pk_delivery_company  PRIMARY KEY (company_id),
+    CONSTRAINT chk_dc_service_type  CHECK (service_type IN ('Standard', 'Express'))
+);
+
+CREATE TABLE delivery (
+    delivery_id             NUMBER          NOT NULL,
+    delivery_status         VARCHAR2(30)    NOT NULL,
+    delivery_address_id     NUMBER          NOT NULL,
+    order_id                NUMBER          NOT NULL,
+    company_id              NUMBER          NOT NULL,
+    CONSTRAINT pk_delivery          PRIMARY KEY (delivery_id),
+    CONSTRAINT uq_delivery_order    UNIQUE (order_id),
+    CONSTRAINT fk_delivery_address  FOREIGN KEY (delivery_address_id)
+        REFERENCES delivery_address (delivery_address_id),
+    CONSTRAINT fk_delivery_order    FOREIGN KEY (order_id)
+        REFERENCES orders (order_id)
+        ON DELETE CASCADE,
+    CONSTRAINT fk_delivery_company  FOREIGN KEY (company_id)
+        REFERENCES delivery_company (company_id)
+);
+
+CREATE TABLE payments (
+    payment_id          NUMBER          NOT NULL,
+    payment_method      VARCHAR2(50)    NOT NULL,
+    amount              NUMBER(10,2)    NOT NULL,
+    status              VARCHAR2(20)    NOT NULL,
+    payment_date        DATE            DEFAULT SYSDATE NOT NULL,
+    order_id            NUMBER          NOT NULL,
+    CONSTRAINT pk_payments          PRIMARY KEY (payment_id),
+    CONSTRAINT fk_payments_order    FOREIGN KEY (order_id)
+        REFERENCES orders (order_id)
+);
+
+CREATE TABLE feedback (
+    feedback_id         NUMBER          NOT NULL,
+    feedback_type       VARCHAR2(20)    NOT NULL,
+    comments            VARCHAR2(4000),
+    status              VARCHAR2(20)    DEFAULT 'Pending' NOT NULL,
+    order_id            NUMBER          NOT NULL,
+    CONSTRAINT pk_feedback          PRIMARY KEY (feedback_id),
+    CONSTRAINT chk_feedback_type    CHECK (feedback_type IN ('Complaint', 'Inquiry')),
+    CONSTRAINT chk_feedback_status  CHECK (status IN ('Pending', 'Resolved')),
+    CONSTRAINT fk_feedback_order    FOREIGN KEY (order_id)
+        REFERENCES orders (order_id)
+        ON DELETE CASCADE
+);
+
+INSERT INTO membership_type VALUES (1, 'Normal', 0.00, 'Standard free membership');
+INSERT INTO membership_type VALUES (2, 'VIP', 6.00, 'Premium membership with exclusive deals');
+
+INSERT INTO restaurants (restaurant_id, name, location, contact_num, category, rating) VALUES (1, 'Golden Spoon Bistro', '1 Hoepker Plaza', '330-167-6111', 'Halal', 4.3);
+INSERT INTO restaurants (restaurant_id, name, location, contact_num, category, rating) VALUES (2, 'Spicy Ember Kitchen', '66649 Russell Road', '706-899-8286', 'Halal', 3.7);
+INSERT INTO restaurants (restaurant_id, name, location, contact_num, category, rating) VALUES (3, 'Urban Crave Café', '376 Hansons Drive', '290-589-4903', 'Non-Halal', 3.4);
+INSERT INTO restaurants (restaurant_id, name, location, contact_num, category, rating) VALUES (4, 'The Hungry Lantern', '908 Artisan Circle', '152-435-1289', 'Halal', 3.1);
+INSERT INTO restaurants (restaurant_id, name, location, contact_num, category, rating) VALUES (5, 'Velvet Fork Dining', '28 Florence Avenue', '991-808-7035', 'Halal', 4.6);
+INSERT INTO restaurants (restaurant_id, name, location, contact_num, category, rating) VALUES (6, 'Midnight Noodle House', '656 Farmco Road', '190-149-9670', 'Non-Halal', 4.2);
+INSERT INTO restaurants (restaurant_id, name, location, contact_num, category, rating) VALUES (7, 'Rustic Flame Grill', '1112 Brown Circle', '265-783-6580', 'Halal', 4.6);
+INSERT INTO restaurants (restaurant_id, name, location, contact_num, category, rating) VALUES (8, 'Ocean Pearl Seafood', '0018 Fuller Hill', '776-153-1559', 'Non-Halal', 4.2);
+INSERT INTO restaurants (restaurant_id, name, location, contact_num, category, rating) VALUES (9, 'Savory Street Eats', '5 Garrison Park', '499-432-8893', 'Halal', 3.3);
+INSERT INTO restaurants (restaurant_id, name, location, contact_num, category, rating) VALUES (10, 'The Cozy Basil', '5100 Eggendart Crossing', '397-209-2049', 'Halal', 4.3);
+
+INSERT INTO member (member_id, name, email, contact, password_hash, registration_date, status, membership_type_id) VALUES (1, 'Tracie', 'tgarrud0@samsung.com', '434-856-8170', '8fa3573a96a821a58c4423c2f7aedf77696fd291ca06ee6de04ee8a349943359', '08-Aug-2023', 'active', 2);
+INSERT INTO member (member_id, name, email, contact, password_hash, registration_date, status, membership_type_id) VALUES (2, 'Barny', 'bbalden1@yandex.ru', '411-691-4034', '22245319c6624601edf752ad6a0d2032b6ac405028164d7ba08a38dad70f6477', '17-Dec-2022', 'active', 1);
+INSERT INTO member (member_id, name, email, contact, password_hash, registration_date, status, membership_type_id) VALUES (3, 'Velvet', 'vmargach2@apple.com', '722-947-4139', '2bd88f020a4e4645d61812cd37cba673ca4893f474e1f08d997121c21738e16b', '04-Jan-2023', 'active', 1);
+INSERT INTO member (member_id, name, email, contact, password_hash, registration_date, status, membership_type_id) VALUES (4, 'Louisa', 'lponten3@simplemachines.org', '632-426-9097', '7214eb3b9b3ca13d8f85787b09eea546d3502fb2706317b3722c108333fc1e41', '08-May-2023', 'suspended', 2);
+INSERT INTO member (member_id, name, email, contact, password_hash, registration_date, status, membership_type_id) VALUES (5, 'Hillary', 'hrevel4@google.com.br', '300-844-0511', '37516244c65e8833b598fe2667448cf95ecd4bbb86e06f1d99c2a24dc4cc2975', '08-Apr-2024', 'suspended', 1);
+INSERT INTO member (member_id, name, email, contact, password_hash, registration_date, status, membership_type_id) VALUES (6, 'Brear', 'bspurman5@harvard.edu', '410-881-2459', '9a4f0cecbe056da08f9e14db55a2143ae72b15a888b24f5aeb679c9b7447fb97', '22-Oct-2022', 'active', 2);
+INSERT INTO member (member_id, name, email, contact, password_hash, registration_date, status, membership_type_id) VALUES (7, 'Izaak', 'imcsporon6@godaddy.com', '206-638-1426', '1409132bbcd5e33e70be63cb14ca644180cfa134eafa9f44267119aced8b7e59', '12-Jun-2023', 'suspended', 1);
+INSERT INTO member (member_id, name, email, contact, password_hash, registration_date, status, membership_type_id) VALUES (8, 'Llewellyn', 'ljosupeit7@macromedia.com', '902-638-5237', 'f4b0eb23230b03d03e752ea7edbc4e78078febac22dbe763bb107df3ca0a29c0', '19-Jan-2023', 'active', 1);
+INSERT INTO member (member_id, name, email, contact, password_hash, registration_date, status, membership_type_id) VALUES (9, 'Ban', 'bgooch8@upenn.edu', '119-954-3338', 'be9b4300f118b0d9d360589d1df5788f9ac60f16168a70e162d9d410f8d2ef87', '09-Jan-2024', 'deleted', 2);
+INSERT INTO member (member_id, name, email, contact, password_hash, registration_date, status, membership_type_id) VALUES (10, 'Cob', 'crawlingson9@amazon.co.uk', '131-158-3005', 'c1670ffd6fdad14839b0e9c92639c5885d29627ea06afbca40fb3340d90e6f74', '19-Oct-2023', 'deleted', 1);
+
+INSERT INTO delivery_company (company_id, company_name, contact_no, service_type) VALUES (1, 'Buzzster', '2441383909', 'Express');
+INSERT INTO delivery_company (company_id, company_name, contact_no, service_type) VALUES (2, 'Kwilith', '9268176821', 'Standard');
+INSERT INTO delivery_company (company_id, company_name, contact_no, service_type) VALUES (3, 'Yodo', '7228057059', 'Standard');
+INSERT INTO delivery_company (company_id, company_name, contact_no, service_type) VALUES (4, 'Rhynoodle', '2601898902', 'Express');
+INSERT INTO delivery_company (company_id, company_name, contact_no, service_type) VALUES (5, 'Fivespan', '1525433847', 'Express');
+INSERT INTO delivery_company (company_id, company_name, contact_no, service_type) VALUES (6, 'Browsezoom', '2578925375', 'Standard');
+INSERT INTO delivery_company (company_id, company_name, contact_no, service_type) VALUES (7, 'Podcat', '2801676278', 'Express');
+INSERT INTO delivery_company (company_id, company_name, contact_no, service_type) VALUES (8, 'Kamba', '4734699873', 'Standard');
+INSERT INTO delivery_company (company_id, company_name, contact_no, service_type) VALUES (9, 'Voolia', '3628471587', 'Express');
+INSERT INTO delivery_company (company_id, company_name, contact_no, service_type) VALUES (10, 'Trupe', '9768284880', 'Express');
+
+INSERT INTO voucher (voucher_id, voucher_code, voucher_type, value, minimum_spend, start_date, end_date, membership_required, status) VALUES (1, 'DEALG5478D', 'Free Delivery', 10, 20, '09-Oct-2022', '08-Apr-2025', 'Normal', 'Active');
+INSERT INTO voucher (voucher_id, voucher_code, voucher_type, value, minimum_spend, start_date, end_date, membership_required, status) VALUES (2, 'DEAL5JI54X', 'Discount', 15, 20, '12-Apr-2023', '22-Oct-2025', 'VIP', 'Active');
+INSERT INTO voucher (voucher_id, voucher_code, voucher_type, value, minimum_spend, start_date, end_date, membership_required, status) VALUES (3, 'DEAL91766J', 'Free Delivery', 5, 15, '09-Jan-2023', '28-Aug-2025', 'VIP', 'Active');
+INSERT INTO voucher (voucher_id, voucher_code, voucher_type, value, minimum_spend, start_date, end_date, membership_required, status) VALUES (4, 'DEAL95B72F', 'Discount', 3, 10, '14-Feb-2023', '22-Jul-2025', 'Normal', 'Expired');
+INSERT INTO voucher (voucher_id, voucher_code, voucher_type, value, minimum_spend, start_date, end_date, membership_required, status) VALUES (5, 'DEALIW5669', 'Discount', 10, 0, '01-Jan-2023', '09-Dec-2023', 'Normal', 'Active');
+INSERT INTO voucher (voucher_id, voucher_code, voucher_type, value, minimum_spend, start_date, end_date, membership_required, status) VALUES (6, 'DEAL57O0CN', 'Discount', 5, 10, '26-Jun-2022', '04-Aug-2025', 'Normal', 'Inactive');
+INSERT INTO voucher (voucher_id, voucher_code, voucher_type, value, minimum_spend, start_date, end_date, membership_required, status) VALUES (7, 'DEAL8I8EE7', 'Free Delivery', 10, 20, '21-Jan-2022', '04-Jun-2023', 'Both', 'Active');
+INSERT INTO voucher (voucher_id, voucher_code, voucher_type, value, minimum_spend, start_date, end_date, membership_required, status) VALUES (8, 'DEAL75D8YP', 'Discount', 2, 20, '04-May-2022', '24-Mar-2025', 'Both', 'Active');
+INSERT INTO voucher (voucher_id, voucher_code, voucher_type, value, minimum_spend, start_date, end_date, membership_required, status) VALUES (9, 'DEAL4IM79X', 'Discount', 15, 10, '28-Jan-2022', '06-May-2024', 'VIP', 'Active');
+INSERT INTO voucher (voucher_id, voucher_code, voucher_type, value, minimum_spend, start_date, end_date, membership_required, status) VALUES (10, 'DEALP1B51N', 'Free Delivery', 10, 0, '23-Aug-2022', '22-Oct-2024', 'Both', 'Active');
+
+INSERT INTO menu (menu_id, item_name, description, price, is_available, type, is_budget_meal, is_super_deal, restaurant_id) VALUES (1, 'Tom Yam', 'Fusce consequat.', 26.99, 1, 'Drink', 0, 0, 5);
+INSERT INTO menu (menu_id, item_name, description, price, is_available, type, is_budget_meal, is_super_deal, restaurant_id) VALUES (2, 'Nasi Lemak', 'In blandit ultrices enim.', 30.58, 1, 'Food', 1, 0, 2);
+INSERT INTO menu (menu_id, item_name, description, price, is_available, type, is_budget_meal, is_super_deal, restaurant_id) VALUES (3, 'Mee Goreng', 'Duis at velit eu est congue elementum.', 22.27, 0, 'Food', 0, 1, 3);
+INSERT INTO menu (menu_id, item_name, description, price, is_available, type, is_budget_meal, is_super_deal, restaurant_id) VALUES (4, 'Roti Canai', 'Duis bibendum.', 23.42, 1, 'Food', 1, 0, 10);
+INSERT INTO menu (menu_id, item_name, description, price, is_available, type, is_budget_meal, is_super_deal, restaurant_id) VALUES (5, 'Tom Yam', 'Sed accumsan felis.', 15.26, 1, 'Drink', 0, 1, 9);
+INSERT INTO menu (menu_id, item_name, description, price, is_available, type, is_budget_meal, is_super_deal, restaurant_id) VALUES (6, 'Burger', 'Duis mattis egestas metus.', 23.47, 1, 'Food', 0, 0, 3);
+INSERT INTO menu (menu_id, item_name, description, price, is_available, type, is_budget_meal, is_super_deal, restaurant_id) VALUES (7, 'Cendol', 'Aliquam erat volutpat.', 22.81, 0, 'Food', 0, 0, 7);
+INSERT INTO menu (menu_id, item_name, description, price, is_available, type, is_budget_meal, is_super_deal, restaurant_id) VALUES (8, 'Pizza', 'Curabitur in libero ut massa volutpat convallis.', 13.53, 1, 'Food', 1, 0, 10);
+INSERT INTO menu (menu_id, item_name, description, price, is_available, type, is_budget_meal, is_super_deal, restaurant_id) VALUES (9, 'Orange Juice', 'Cum sociis natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus.', 31.13, 0, 'Food', 0, 0, 3);
+INSERT INTO menu (menu_id, item_name, description, price, is_available, type, is_budget_meal, is_super_deal, restaurant_id) VALUES (10, 'Teh Tarik', 'Phasellus sit amet erat.', 21.08, 0, 'Drink', 0, 1, 5);
+INSERT INTO menu (menu_id, item_name, description, price, is_available, type, is_budget_meal, is_super_deal, restaurant_id) VALUES (11, 'Nasi Lemak', 'Cras non velit nec nisi vulputate nonummy.', 34.81, 1, 'Food', 0, 0, 7);
+INSERT INTO menu (menu_id, item_name, description, price, is_available, type, is_budget_meal, is_super_deal, restaurant_id) VALUES (12, 'Nasi Lemak', 'Nulla neque libero, convallis eget, eleifend luctus, ultricies eu, nibh.', 16.63, 1, 'Food', 1, 0, 10);
+INSERT INTO menu (menu_id, item_name, description, price, is_available, type, is_budget_meal, is_super_deal, restaurant_id) VALUES (13, 'Nasi Lemak', 'Nullam orci pede, venenatis non, sodales sed, tincidunt eu, felis.', 25.94, 1, 'Food', 0, 0, 2);
+INSERT INTO menu (menu_id, item_name, description, price, is_available, type, is_budget_meal, is_super_deal, restaurant_id) VALUES (14, 'Orange Juice', 'Ut tellus.', 29.47, 1, 'Food', 0, 0, 9);
+INSERT INTO menu (menu_id, item_name, description, price, is_available, type, is_budget_meal, is_super_deal, restaurant_id) VALUES (15, 'Fried Rice', 'Etiam faucibus cursus urna.', 26.35, 0, 'Food', 0, 0, 5);
+INSERT INTO menu (menu_id, item_name, description, price, is_available, type, is_budget_meal, is_super_deal, restaurant_id) VALUES (16, 'Sirap Bandung', 'Suspendisse accumsan tortor quis turpis.', 17.68, 1, 'Food', 0, 1, 7);
+INSERT INTO menu (menu_id, item_name, description, price, is_available, type, is_budget_meal, is_super_deal, restaurant_id) VALUES (17, 'Sirap Bandung', 'Maecenas rhoncus aliquam lacus.', 32.57, 1, 'Food', 1, 1, 5);
+INSERT INTO menu (menu_id, item_name, description, price, is_available, type, is_budget_meal, is_super_deal, restaurant_id) VALUES (18, 'Tom Yam', 'In hac habitasse platea dictumst.', 29.07, 1, 'Food', 0, 0, 4);
+INSERT INTO menu (menu_id, item_name, description, price, is_available, type, is_budget_meal, is_super_deal, restaurant_id) VALUES (19, 'Nasi Lemak', 'Praesent blandit lacinia erat.', 17.01, 0, 'Food', 0, 0, 9);
+INSERT INTO menu (menu_id, item_name, description, price, is_available, type, is_budget_meal, is_super_deal, restaurant_id) VALUES (20, 'Sirap Bandung', 'Vestibulum ante ipsum primis in faucibus orci luctus et ultrices posuere cubilia Curae; Duis faucibus accumsan odio.', 5.37, 1, 'Food', 0, 0, 8);
+INSERT INTO menu (menu_id, item_name, description, price, is_available, type, is_budget_meal, is_super_deal, restaurant_id) VALUES (21, 'Orange Juice', 'Donec quis orci eget orci vehicula condimentum.', 13.87, 1, 'Food', 0, 0, 5);
+INSERT INTO menu (menu_id, item_name, description, price, is_available, type, is_budget_meal, is_super_deal, restaurant_id) VALUES (22, 'Char Kway Teow', 'Duis aliquam convallis nunc.', 19.15, 1, 'Drink', 1, 0, 7);
+INSERT INTO menu (menu_id, item_name, description, price, is_available, type, is_budget_meal, is_super_deal, restaurant_id) VALUES (23, 'Milo Ais', 'Donec ut dolor.', 15.4, 1, 'Food', 0, 1, 1);
+INSERT INTO menu (menu_id, item_name, description, price, is_available, type, is_budget_meal, is_super_deal, restaurant_id) VALUES (24, 'Burger', 'Etiam justo.', 27.26, 0, 'Food', 0, 1, 4);
+INSERT INTO menu (menu_id, item_name, description, price, is_available, type, is_budget_meal, is_super_deal, restaurant_id) VALUES (25, 'Roti Canai', 'Cras non velit nec nisi vulputate nonummy.', 29.6, 1, 'Food', 0, 1, 7);
+INSERT INTO menu (menu_id, item_name, description, price, is_available, type, is_budget_meal, is_super_deal, restaurant_id) VALUES (26, 'Cendol', 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit.', 20.69, 1, 'Food', 1, 0, 6);
+INSERT INTO menu (menu_id, item_name, description, price, is_available, type, is_budget_meal, is_super_deal, restaurant_id) VALUES (27, 'Orange Juice', 'Vestibulum quam sapien, varius ut, blandit non, interdum in, ante.', 9.39, 0, 'Food', 0, 0, 7);
+INSERT INTO menu (menu_id, item_name, description, price, is_available, type, is_budget_meal, is_super_deal, restaurant_id) VALUES (28, 'Pizza', 'Praesent blandit.', 31.57, 1, 'Food', 0, 0, 1);
+INSERT INTO menu (menu_id, item_name, description, price, is_available, type, is_budget_meal, is_super_deal, restaurant_id) VALUES (29, 'Nasi Lemak', 'Cum sociis natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus.', 25.28, 0, 'Food', 0, 0, 4);
+INSERT INTO menu (menu_id, item_name, description, price, is_available, type, is_budget_meal, is_super_deal, restaurant_id) VALUES (30, 'Fried Rice', 'Ut at dolor quis odio consequat varius.', 24.57, 1, 'Food', 0, 0, 10);
+INSERT INTO menu (menu_id, item_name, description, price, is_available, type, is_budget_meal, is_super_deal, restaurant_id) VALUES (31, 'Nasi Lemak', 'Praesent blandit lacinia erat.', 14.43, 1, 'Food', 0, 0, 6);
+INSERT INTO menu (menu_id, item_name, description, price, is_available, type, is_budget_meal, is_super_deal, restaurant_id) VALUES (32, 'Milo Ais', 'Integer ac leo.', 14.08, 1, 'Food', 0, 0, 9);
+INSERT INTO menu (menu_id, item_name, description, price, is_available, type, is_budget_meal, is_super_deal, restaurant_id) VALUES (33, 'Sirap Bandung', 'Integer ac neque.', 23.56, 1, 'Food', 1, 0, 5);
+INSERT INTO menu (menu_id, item_name, description, price, is_available, type, is_budget_meal, is_super_deal, restaurant_id) VALUES (34, 'Ayam Goreng', 'Maecenas tincidunt lacus at velit.', 8.48, 1, 'Food', 1, 1, 6);
+INSERT INTO menu (menu_id, item_name, description, price, is_available, type, is_budget_meal, is_super_deal, restaurant_id) VALUES (35, 'Cendol', 'Morbi vestibulum, velit id pretium iaculis, diam erat fermentum justo, nec condimentum neque sapien placerat ante.', 18.35, 1, 'Food', 0, 0, 3);
+INSERT INTO menu (menu_id, item_name, description, price, is_available, type, is_budget_meal, is_super_deal, restaurant_id) VALUES (36, 'Char Kway Teow', 'Fusce lacus purus, aliquet at, feugiat non, pretium quis, lectus.', 12.43, 0, 'Drink', 0, 0, 10);
+INSERT INTO menu (menu_id, item_name, description, price, is_available, type, is_budget_meal, is_super_deal, restaurant_id) VALUES (37, 'Char Kway Teow', 'Vivamus in felis eu sapien cursus vestibulum.', 5.89, 1, 'Food', 0, 0, 4);
+INSERT INTO menu (menu_id, item_name, description, price, is_available, type, is_budget_meal, is_super_deal, restaurant_id) VALUES (38, 'Milo Ais', 'Donec odio justo, sollicitudin ut, suscipit a, feugiat et, eros.', 14.49, 1, 'Drink', 0, 0, 9);
+INSERT INTO menu (menu_id, item_name, description, price, is_available, type, is_budget_meal, is_super_deal, restaurant_id) VALUES (39, 'Char Kway Teow', 'Aenean lectus.', 24.65, 1, 'Drink', 0, 1, 10);
+INSERT INTO menu (menu_id, item_name, description, price, is_available, type, is_budget_meal, is_super_deal, restaurant_id) VALUES (40, 'Laksa', 'Nam ultrices, libero non mattis pulvinar, nulla pede ullamcorper augue, a suscipit nulla elit ac nulla.', 14.03, 1, 'Food', 0, 0, 1);
+
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (1, '6879 Riverside Alley', 'Victoir Warnes', '591-404-0794', 2);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (2, '23058 Lotheville Center', 'Lavinie Worcs', '240-812-6708', 6);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (3, '62 Forest Dale Center', 'Xenos Dobrovolny', '291-840-3302', 10);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (4, '8812 Bartillon Hill', 'Arni Tidswell', '457-263-3731', 4);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (5, '91292 Pawling Drive', 'Matilda Burless', '178-843-0664', 4);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (6, '58 Karstens Parkway', 'Shirlene Matthews', '163-461-9586', 8);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (7, '240 Division Trail', 'Leena Lerwell', '325-406-3407', 3);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (8, '7713 Corscot Court', 'Brittani Happert', '978-970-7490', 2);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (9, '762 Nelson Circle', 'Bill Aucott', '902-284-5658', 1);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (10, '5822 Bellgrove Road', 'Paul Rozet', '144-544-6779', 2);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (11, '995 Kennedy Junction', 'Marin Yakubov', '958-625-3719', 2);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (12, '90073 East Alley', 'Heather Izkoveski', '684-115-3866', 8);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (13, '5192 Graedel Place', 'Hyacintha Hurlin', '613-944-8355', 2);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (14, '7094 Lyons Way', 'Bertie Giroldo', '712-256-6616', 7);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (15, '66535 Leroy Road', 'Hyacinthie Greenig', '622-560-5595', 3);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (16, '39 Hoepker Street', 'Ashely Dows', '145-330-8895', 10);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (17, '80 Sloan Terrace', 'Maitilde Gilley', '238-124-8414', 1);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (18, '4 Briar Crest Center', 'Samaria Duggen', '814-970-6017', 3);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (19, '043 Sommers Center', 'Delcine Pratte', '576-241-1707', 3);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (20, '417 Artisan Lane', 'Christy Huonic', '602-936-8799', 6);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (21, '696 Buhler Alley', 'Helga Hunte', '799-315-0648', 7);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (22, '180 Green Pass', 'Meredeth Janeway', '919-308-2400', 4);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (23, '38 Hermina Road', 'Portie Fagg', '124-193-2820', 7);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (24, '8 Veith Pass', 'Christy Dwight', '243-423-9181', 6);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (25, '425 Commercial Trail', 'Tallie Aindrais', '368-166-9166', 5);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (26, '73060 Clove Plaza', 'Modesty Nobles', '520-250-4966', 9);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (27, '3 Moland Road', 'Kylynn Deavin', '413-605-4994', 1);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (28, '14240 Utah Place', 'Valera Senescall', '303-201-5450', 8);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (29, '14854 Tomscot Street', 'Rufus Fellman', '889-482-3216', 10);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (30, '57 Sloan Junction', 'Heda Fuster', '994-760-7975', 9);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (31, '01 Eagan Plaza', 'Alden Tofful', '242-855-5125', 6);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (32, '926 Veith Terrace', 'Jo Bravery', '246-752-0959', 6);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (33, '8 Porter Way', 'Georgine Denzilow', '207-615-3430', 10);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (34, '704 Esch Hill', 'Bradley Berryman', '586-838-0245', 2);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (35, '8405 Barnett Junction', 'Kain Beggini', '727-263-2575', 2);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (36, '5842 Merchant Center', 'Thedric Lucks', '385-479-7256', 5);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (37, '5 Kipling Junction', 'Elias Fielden', '464-263-2398', 6);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (38, '6 Main Court', 'Nady Haxell', '540-248-2348', 7);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (39, '74986 Spenser Park', 'Rikki Gilroy', '266-826-2019', 2);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (40, '1689 Mayer Alley', 'Munroe McGilmartin', '734-837-0325', 9);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (41, '74438 Mccormick Point', 'Rockie Sheasby', '887-967-8800', 5);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (42, '0 Brickson Park Avenue', 'Bobbye Lundbeck', '258-393-4833', 5);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (43, '500 Florence Court', 'Ira Philipson', '807-509-4521', 2);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (44, '9967 Ramsey Place', 'Tiertza Massot', '683-114-2241', 7);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (45, '9377 Reindahl Junction', 'Karel Pywell', '414-666-8269', 1);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (46, '6 Sheridan Road', 'Almire Yarwood', '307-872-6490', 5);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (47, '239 Hudson Drive', 'Emmi Atteridge', '230-856-8516', 2);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (48, '143 Nova Way', 'Lizabeth Fardon', '139-653-1057', 7);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (49, '03893 Mayfield Parkway', 'Isak Timmins', '964-897-7560', 8);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (50, '1941 Logan Parkway', 'Saxon Blamire', '951-685-7262', 1);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (51, '0 Blaine Drive', 'Taffy Behninck', '472-420-7271', 9);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (52, '0426 Kennedy Way', 'Ingrim Tointon', '144-275-2186', 10);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (53, '5 Troy Trail', 'Sofie Bampkin', '619-983-9304', 4);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (54, '9 Meadow Valley Pass', 'Edouard McCafferty', '930-314-8976', 3);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (55, '6254 Debs Avenue', 'Sharyl Gracewood', '450-823-8353', 10);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (56, '4181 Talmadge Court', 'Kipp Pinches', '882-566-3249', 1);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (57, '93 Hooker Pass', 'Missie Tern', '588-884-2181', 7);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (58, '69405 Maywood Park', 'Judi Towndrow', '349-181-2725', 5);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (59, '1 Mcguire Drive', 'Jade Widdows', '286-582-0920', 2);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (60, '2 Briar Crest Pass', 'Nola Grinvalds', '861-822-1135', 2);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (61, '10 Farmco Point', 'Martha Casillas', '829-341-6233', 1);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (62, '90 Mccormick Drive', 'Berton Clewley', '438-700-5405', 7);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (63, '127 Elka Road', 'Vernice Dei', '796-209-5266', 10);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (64, '44773 Blaine Crossing', 'Gerti Filipov', '283-745-8324', 5);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (65, '7636 Mayer Drive', 'Pete Stafford', '191-939-8637', 6);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (66, '25823 Toban Terrace', 'Junia Roach', '495-912-5089', 4);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (67, '98 Bay Drive', 'Elizabeth Sweett', '681-326-4626', 1);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (68, '0452 Sunfield Center', 'Cris Dallicoat', '675-383-8278', 10);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (69, '9493 Evergreen Way', 'Bevvy Maris', '383-828-0446', 8);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (70, '7 Nevada Center', 'Tammie Pashan', '261-616-1398', 9);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (71, '143 Waywood Crossing', 'Bianca Mahy', '551-354-0623', 4);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (72, '35906 Loomis Street', 'Cyndy Veivers', '642-964-3815', 5);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (73, '93570 Butternut Pass', 'Darbee Streeter', '276-298-3690', 3);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (74, '2 Carey Hill', 'Esmaria Farguhar', '565-408-5427', 6);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (75, '17 Division Avenue', 'Marcellina Taynton', '814-157-4197', 9);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (76, '38177 Dwight Drive', 'Abner Miguel', '723-764-8143', 1);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (77, '69584 Steensland Center', 'Mercy Baford', '707-798-3093', 1);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (78, '51 Autumn Leaf Alley', 'Nil Rubinowitsch', '656-650-3473', 3);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (79, '58 Crownhardt Circle', 'Gene Bwye', '767-727-1494', 2);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (80, '27 Loftsgordon Circle', 'Bernelle Druhan', '387-687-3056', 8);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (81, '8 Doe Crossing Way', 'Shurlocke Manwell', '927-681-8282', 5);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (82, '88289 Manley Street', 'Rodina Millberg', '192-508-5317', 6);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (83, '2791 Cherokee Street', 'Dew Sample', '923-524-2490', 10);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (84, '246 Dottie Park', 'Alexandra Blind', '649-160-8339', 10);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (85, '4716 Northfield Junction', 'Reine Foxworthy', '450-610-1936', 4);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (86, '4676 Stang Way', 'Brendan Cooch', '314-158-4409', 3);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (87, '82378 Susan Point', 'Esteban Sunter', '854-910-0288', 3);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (88, '38456 Dixon Crossing', 'Sollie Tuxill', '585-782-8879', 7);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (89, '7 Claremont Circle', 'Graeme Eggleston', '753-394-5077', 10);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (90, '50696 Schiller Place', 'Ellie Blacker', '137-141-7499', 10);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (91, '4323 2nd Plaza', 'Parnell Aron', '458-577-3066', 7);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (92, '77 Summit Crossing', 'Kelwin Cadagan', '661-776-9426', 3);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (93, '87 Garrison Street', 'Anetta Trimme', '775-540-8551', 9);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (94, '48779 South Place', 'Evita Crayker', '107-185-5641', 9);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (95, '3 Pierstorff Pass', 'Ursula Burroughes', '960-250-6837', 7);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (96, '6 Haas Hill', 'Raquela Asmus', '813-990-0522', 3);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (97, '3885 Mifflin Hill', 'Vikky De La Coste', '213-973-3947', 1);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (98, '7 Crescent Oaks Plaza', 'Niven Lafayette', '402-674-9158', 8);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (99, '647 Hovde Trail', 'Kale Lorroway', '240-149-1527', 9);
+INSERT INTO delivery_address (delivery_address_id, address, contact_person, contact_no, member_id) VALUES (100, '129 Laurel Court', 'Fiorenze De La Cote', '124-977-0224', 2);
+
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (1, 118.76, '18-Aug-2022', 'Pending', 'Dine-In', 9, 1);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (2, 73.63, '24-Sep-2024', 'Delivered', 'Dine-In', 1, 5);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (3, 28.65, '17-Apr-2024', 'Delivered', 'Delivery', 1, 8);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (4, 73.06, '21-May-2022', 'Cancelled', 'Dine-In', 1, 5);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (5, 24.02, '23-Mar-2024', 'Out for Delivery', 'Dine-In', 7, 8);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (6, 86.48, '19-Aug-2022', 'Delivered', 'Dine-In', 10, 2);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (7, 42.13, '04-Dec-2023', 'Out for Delivery', 'Delivery', 9, 4);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (8, 40.01, '11-Oct-2023', 'Cancelled', 'Delivery', 7, 6);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (9, 96.05, '14-Jul-2024', 'Out for Delivery', 'Dine-In', 6, 10);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (10, 80.52, '18-Jan-2023', 'Pending', 'Dine-In', 9, 8);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (11, 85.58, '28-Aug-2023', 'Delivered', 'Dine-In', 6, 4);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (12, 101.45, '02-Dec-2023', 'Out for Delivery', 'Delivery', 6, 9);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (13, 55.69, '12-Dec-2022', 'Pending', 'Dine-In', 8, 3);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (14, 36.46, '26-Feb-2022', 'Preparing', 'Dine-In', 7, 3);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (15, 35.07, '25-Jan-2023', 'Pending', 'Dine-In', 2, 3);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (16, 71.87, '30-Oct-2024', 'Preparing', 'Dine-In', 3, 4);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (17, 71.59, '02-Nov-2024', 'Preparing', 'Dine-In', 2, 3);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (18, 61.74, '09-May-2023', 'Cancelled', 'Dine-In', 2, 2);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (19, 59.36, '24-Sep-2022', 'Delivered', 'Dine-In', 5, 1);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (20, 100.06, '04-Dec-2024', 'Preparing', 'Delivery', 2, 3);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (21, 44.79, '17-Mar-2024', 'Confirmed', 'Delivery', 8, 7);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (22, 32.29, '06-Jan-2022', 'Delivered', 'Dine-In', 7, 10);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (23, 113.52, '13-Jun-2024', 'Cancelled', 'Dine-In', 2, 6);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (24, 114.91, '23-Feb-2024', 'Out for Delivery', 'Dine-In', 3, 9);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (25, 46.55, '14-Jan-2022', 'Pending', 'Delivery', 2, 2);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (26, 33.35, '13-Oct-2023', 'Preparing', 'Dine-In', 4, 3);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (27, 23.28, '01-Apr-2022', 'Out for Delivery', 'Dine-In', 7, 6);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (28, 40.37, '04-Feb-2022', 'Out for Delivery', 'Delivery', 8, 8);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (29, 58.99, '29-May-2022', 'Cancelled', 'Delivery', 7, 7);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (30, 36.18, '25-Oct-2023', 'Confirmed', 'Delivery', 9, 5);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (31, 41.94, '18-Jun-2022', 'Delivered', 'Dine-In', 8, 7);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (32, 37.2, '06-Oct-2023', 'Preparing', 'Dine-In', 9, 6);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (33, 8.4, '20-Sep-2024', 'Delivered', 'Delivery', 8, 3);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (34, 112.02, '04-Mar-2022', 'Pending', 'Dine-In', 9, 5);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (35, 96.23, '12-May-2023', 'Pending', 'Dine-In', 6, 7);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (36, 43.49, '01-Jun-2023', 'Preparing', 'Dine-In', 9, 6);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (37, 69.14, '02-Jul-2022', 'Cancelled', 'Dine-In', 4, 4);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (38, 27.26, '25-Feb-2024', 'Pending', 'Dine-In', 5, 10);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (39, 41.1, '17-Apr-2023', 'Preparing', 'Delivery', 8, 10);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (40, 100.37, '03-Apr-2024', 'Pending', 'Delivery', 4, 10);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (41, 88.0, '02-Jan-2022', 'Out for Delivery', 'Delivery', 4, 1);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (42, 91.89, '16-Mar-2024', 'Cancelled', 'Dine-In', 10, 6);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (43, 22.71, '11-Jun-2023', 'Pending', 'Dine-In', 9, 9);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (44, 52.78, '07-Jun-2024', 'Cancelled', 'Delivery', 1, 9);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (45, 65.61, '17-Nov-2023', 'Pending', 'Delivery', 2, 3);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (46, 43.11, '14-Mar-2024', 'Pending', 'Delivery', 1, 4);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (47, 58.98, '16-Mar-2023', 'Delivered', 'Delivery', 8, 8);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (48, 15.56, '18-Dec-2024', 'Preparing', 'Dine-In', 7, 5);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (49, 65.31, '26-Aug-2024', 'Confirmed', 'Dine-In', 4, 8);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (50, 90.96, '25-Jan-2022', 'Preparing', 'Delivery', 5, 1);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (51, 88.34, '10-Feb-2024', 'Cancelled', 'Dine-In', 1, 2);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (52, 71.48, '25-Apr-2022', 'Confirmed', 'Delivery', 6, 6);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (53, 67.2, '07-Jul-2023', 'Delivered', 'Dine-In', 8, 5);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (54, 32.62, '25-Feb-2023', 'Delivered', 'Dine-In', 3, 1);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (55, 45.68, '01-Jul-2023', 'Confirmed', 'Dine-In', 3, 5);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (56, 64.01, '19-May-2023', 'Pending', 'Delivery', 3, 1);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (57, 108.41, '05-Oct-2023', 'Pending', 'Dine-In', 10, 4);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (58, 8.85, '24-Apr-2022', 'Cancelled', 'Delivery', 7, 1);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (59, 18.86, '15-Dec-2022', 'Preparing', 'Dine-In', 1, 5);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (60, 9.75, '13-Dec-2022', 'Delivered', 'Dine-In', 6, 7);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (61, 18.47, '24-Jan-2024', 'Cancelled', 'Dine-In', 6, 7);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (62, 114.47, '23-Sep-2022', 'Out for Delivery', 'Dine-In', 4, 8);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (63, 101.53, '16-Nov-2024', 'Out for Delivery', 'Dine-In', 6, 6);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (64, 8.06, '24-Sep-2023', 'Delivered', 'Delivery', 1, 8);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (65, 13.26, '27-Nov-2024', 'Pending', 'Dine-In', 6, 2);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (66, 69.05, '07-Nov-2023', 'Preparing', 'Delivery', 8, 7);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (67, 46.14, '09-May-2022', 'Preparing', 'Dine-In', 1, 8);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (68, 104.26, '13-Jul-2023', 'Out for Delivery', 'Dine-In', 10, 7);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (69, 66.39, '24-Nov-2024', 'Preparing', 'Dine-In', 2, 5);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (70, 56.97, '15-Aug-2023', 'Cancelled', 'Dine-In', 9, 8);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (71, 82.06, '20-Dec-2024', 'Pending', 'Delivery', 3, 7);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (72, 10.34, '21-Jan-2023', 'Preparing', 'Dine-In', 1, 10);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (73, 51.25, '18-Oct-2024', 'Preparing', 'Dine-In', 10, 3);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (74, 94.76, '14-Feb-2023', 'Cancelled', 'Delivery', 6, 6);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (75, 78.56, '31-Dec-2023', 'Preparing', 'Dine-In', 10, 3);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (76, 60.87, '06-Nov-2022', 'Delivered', 'Dine-In', 6, 1);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (77, 29.68, '18-Oct-2023', 'Confirmed', 'Dine-In', 10, 7);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (78, 88.36, '17-Jul-2024', 'Out for Delivery', 'Delivery', 8, 1);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (79, 80.16, '29-Feb-2024', 'Cancelled', 'Dine-In', 5, 10);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (80, 27.03, '01-Sep-2022', 'Confirmed', 'Dine-In', 9, 10);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (81, 20.38, '05-Oct-2024', 'Confirmed', 'Delivery', 10, 4);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (82, 30.09, '31-Oct-2022', 'Out for Delivery', 'Delivery', 7, 5);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (83, 63.26, '07-Jun-2023', 'Out for Delivery', 'Dine-In', 7, 9);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (84, 101.61, '27-Feb-2022', 'Cancelled', 'Dine-In', 1, 5);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (85, 28.66, '22-May-2022', 'Confirmed', 'Dine-In', 1, 4);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (86, 86.16, '22-Aug-2023', 'Confirmed', 'Dine-In', 10, 9);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (87, 16.56, '22-Jun-2024', 'Out for Delivery', 'Dine-In', 8, 8);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (88, 52.67, '05-Apr-2023', 'Pending', 'Dine-In', 2, 2);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (89, 53.35, '14-Mar-2023', 'Preparing', 'Dine-In', 7, 10);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (90, 31.8, '07-Jan-2022', 'Confirmed', 'Dine-In', 2, 10);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (91, 49.88, '06-Jul-2023', 'Delivered', 'Delivery', 4, 7);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (92, 10.05, '08-Oct-2024', 'Out for Delivery', 'Dine-In', 9, 3);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (93, 78.31, '17-Jan-2024', 'Delivered', 'Delivery', 8, 8);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (94, 111.33, '03-Apr-2022', 'Confirmed', 'Delivery', 1, 3);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (95, 79.89, '06-Jul-2023', 'Pending', 'Delivery', 1, 5);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (96, 89.3, '14-Feb-2024', 'Pending', 'Dine-In', 3, 8);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (97, 88.89, '04-May-2022', 'Pending', 'Delivery', 4, 9);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (98, 24.23, '25-May-2023', 'Preparing', 'Dine-In', 3, 8);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (99, 97.03, '12-Dec-2023', 'Preparing', 'Dine-In', 9, 10);
+INSERT INTO orders (order_id, amount, order_date, order_status, order_type, restaurant_id, member_id) VALUES (100, 48.74, '15-Apr-2022', 'Preparing', 'Dine-In', 5, 5);
+
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (1, 'Cash on Delivery', 22.02, 'Pending', '04-Jul-2023', 5);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (2, 'Cash on Delivery', 27.55, 'Pending', '12-Aug-2023', 90);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (3, 'Online Banking', 37.05, 'Pending', '14-Jan-2024', 9);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (4, 'Debit Card', 14.4, 'Paid', '26-Mar-2023', 95);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (5, 'Online Banking', 21.41, 'Paid', '27-Nov-2022', 88);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (6, 'eWallet', 28.16, 'Paid', '15-Oct-2022', 31);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (7, 'Debit Card', 6.5, 'Paid', '23-Jul-2024', 66);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (8, 'Cash on Delivery', 35.28, 'Pending', '01-Jan-2022', 18);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (9, 'eWallet', 10.1, 'Failed', '19-Mar-2022', 27);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (10, 'eWallet', 11.31, 'Failed', '19-Oct-2023', 46);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (11, 'Online Banking', 38.75, 'Paid', '31-Jan-2022', 89);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (12, 'Debit Card', 40.37, 'Paid', '11-Aug-2022', 40);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (13, 'Credit Card', 55.46, 'Paid', '08-Jun-2024', 76);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (14, 'Cash on Delivery', 12.83, 'Paid', '07-Jul-2023', 53);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (15, 'Cash on Delivery', 11.17, 'Failed', '22-Aug-2024', 67);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (16, 'Online Banking', 15.04, 'Failed', '25-Apr-2022', 26);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (17, 'Cash on Delivery', 34.16, 'Paid', '12-Jun-2024', 34);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (18, 'Cash on Delivery', 49.99, 'Paid', '15-Aug-2023', 10);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (19, 'Cash on Delivery', 40.17, 'Pending', '15-Sep-2024', 95);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (20, 'Cash on Delivery', 49.9, 'Paid', '07-May-2022', 8);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (21, 'Cash on Delivery', 55.03, 'Paid', '24-Jun-2022', 44);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (22, 'Debit Card', 5.12, 'Failed', '05-May-2023', 36);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (23, 'eWallet', 4.66, 'Pending', '13-Jun-2023', 20);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (24, 'Debit Card', 11.33, 'Paid', '21-Dec-2024', 45);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (25, 'eWallet', 46.53, 'Paid', '24-Nov-2024', 12);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (26, 'Credit Card', 24.03, 'Paid', '09-Jun-2022', 99);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (27, 'Debit Card', 6.07, 'Failed', '28-Jan-2023', 41);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (28, 'Cash on Delivery', 33.32, 'Failed', '04-Mar-2024', 85);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (29, 'Cash on Delivery', 15.92, 'Paid', '05-Nov-2023', 47);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (30, 'Cash on Delivery', 41.26, 'Failed', '11-Nov-2023', 49);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (31, 'Cash on Delivery', 42.36, 'Paid', '02-Dec-2024', 62);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (32, 'Credit Card', 6.97, 'Paid', '27-May-2023', 38);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (33, 'Cash on Delivery', 39.13, 'Paid', '04-Oct-2023', 45);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (34, 'Online Banking', 53.0, 'Paid', '31-Aug-2023', 85);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (35, 'Online Banking', 54.36, 'Failed', '14-Oct-2022', 82);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (36, 'Debit Card', 31.4, 'Failed', '02-Jan-2024', 62);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (37, 'Debit Card', 41.09, 'Failed', '11-Feb-2023', 14);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (38, 'eWallet', 26.53, 'Paid', '23-Jul-2024', 62);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (39, 'Debit Card', 13.65, 'Paid', '28-Jul-2024', 22);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (40, 'Online Banking', 35.23, 'Paid', '08-Dec-2024', 97);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (41, 'eWallet', 15.5, 'Failed', '23-Apr-2024', 83);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (42, 'eWallet', 10.51, 'Paid', '21-May-2023', 97);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (43, 'Debit Card', 48.59, 'Paid', '26-Aug-2024', 50);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (44, 'Online Banking', 31.15, 'Paid', '17-Oct-2023', 15);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (45, 'Credit Card', 31.95, 'Pending', '14-Dec-2023', 12);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (46, 'Credit Card', 35.33, 'Paid', '04-Jul-2023', 53);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (47, 'eWallet', 59.72, 'Pending', '24-Oct-2023', 45);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (48, 'Online Banking', 56.84, 'Pending', '29-Aug-2024', 71);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (49, 'Cash on Delivery', 25.31, 'Pending', '12-Apr-2024', 80);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (50, 'Online Banking', 18.58, 'Failed', '29-Jul-2022', 84);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (51, 'Debit Card', 57.02, 'Pending', '02-Jan-2024', 95);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (52, 'Cash on Delivery', 23.15, 'Paid', '16-Aug-2023', 78);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (53, 'Credit Card', 5.29, 'Failed', '11-Jan-2024', 46);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (54, 'Debit Card', 15.86, 'Paid', '11-May-2023', 98);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (55, 'Cash on Delivery', 42.75, 'Pending', '01-Nov-2022', 43);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (56, 'eWallet', 37.54, 'Paid', '19-Sep-2023', 13);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (57, 'Debit Card', 59.15, 'Failed', '15-Mar-2024', 37);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (58, 'Online Banking', 12.47, 'Paid', '02-Dec-2023', 35);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (59, 'Cash on Delivery', 31.53, 'Paid', '13-Feb-2024', 45);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (60, 'eWallet', 59.56, 'Paid', '26-Aug-2022', 58);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (61, 'eWallet', 44.19, 'Paid', '24-Nov-2024', 60);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (62, 'Debit Card', 17.43, 'Pending', '24-Apr-2023', 13);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (63, 'Cash on Delivery', 50.62, 'Paid', '05-Feb-2023', 58);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (64, 'Cash on Delivery', 13.8, 'Paid', '18-Mar-2022', 97);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (65, 'Cash on Delivery', 22.67, 'Failed', '15-Jan-2024', 36);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (66, 'Cash on Delivery', 32.0, 'Paid', '23-Apr-2024', 10);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (67, 'Credit Card', 4.15, 'Failed', '30-Jan-2024', 42);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (68, 'Online Banking', 38.74, 'Paid', '06-Jun-2023', 88);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (69, 'Debit Card', 9.7, 'Failed', '05-Jun-2023', 38);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (70, 'Credit Card', 18.33, 'Failed', '27-Jan-2023', 5);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (71, 'eWallet', 55.9, 'Paid', '19-Jan-2023', 39);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (72, 'Online Banking', 47.75, 'Failed', '06-Jul-2024', 83);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (73, 'Online Banking', 44.68, 'Paid', '26-May-2024', 48);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (74, 'Cash on Delivery', 23.63, 'Paid', '27-Oct-2022', 47);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (75, 'Cash on Delivery', 52.91, 'Paid', '17-Jan-2024', 51);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (76, 'Debit Card', 23.05, 'Paid', '28-Dec-2024', 94);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (77, 'Credit Card', 36.37, 'Paid', '30-May-2023', 66);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (78, 'Credit Card', 10.98, 'Paid', '23-Apr-2024', 42);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (79, 'Cash on Delivery', 46.75, 'Failed', '07-May-2024', 16);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (80, 'eWallet', 50.59, 'Failed', '26-Jan-2024', 68);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (81, 'Cash on Delivery', 22.59, 'Paid', '27-Feb-2023', 90);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (82, 'Credit Card', 59.26, 'Pending', '16-Sep-2023', 24);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (83, 'Debit Card', 32.71, 'Pending', '01-Jul-2023', 93);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (84, 'Credit Card', 37.46, 'Paid', '26-Oct-2022', 3);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (85, 'Cash on Delivery', 16.39, 'Paid', '27-Aug-2024', 41);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (86, 'Cash on Delivery', 51.65, 'Paid', '15-Jul-2023', 49);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (87, 'Debit Card', 22.17, 'Paid', '30-Jul-2024', 26);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (88, 'eWallet', 51.64, 'Paid', '15-Aug-2024', 9);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (89, 'Credit Card', 9.65, 'Paid', '07-Oct-2022', 46);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (90, 'Debit Card', 36.39, 'Failed', '16-May-2024', 19);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (91, 'Online Banking', 57.68, 'Pending', '18-Apr-2023', 48);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (92, 'Credit Card', 43.66, 'Failed', '30-Nov-2022', 48);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (93, 'Debit Card', 25.71, 'Failed', '13-Apr-2023', 93);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (94, 'Credit Card', 12.57, 'Pending', '28-Jul-2024', 100);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (95, 'Credit Card', 53.24, 'Paid', '29-May-2023', 18);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (96, 'Debit Card', 10.81, 'Paid', '06-Jan-2022', 91);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (97, 'Credit Card', 50.76, 'Paid', '29-May-2024', 100);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (98, 'eWallet', 38.24, 'Paid', '17-May-2022', 77);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (99, 'Debit Card', 31.14, 'Paid', '12-Jun-2023', 96);
+INSERT INTO payments (payment_id, payment_method, amount, status, payment_date, order_id) VALUES (100, 'Online Banking', 10.75, 'Paid', '29-Jul-2022', 93);
+
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (1, 'Pending', 90, 1, 8);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (2, 'Pending', 37, 2, 8);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (3, 'Delivered', 59, 3, 3);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (4, 'Delivered', 74, 4, 1);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (5, 'Failed', 2, 5, 2);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (6, 'Picked Up', 13, 6, 2);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (7, 'Pending', 94, 7, 10);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (8, 'Pending', 1, 8, 6);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (9, 'Delivered', 83, 9, 9);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (10, 'In Transit', 26, 10, 2);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (11, 'Picked Up', 75, 11, 6);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (12, 'Delivered', 97, 12, 8);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (13, 'Picked Up', 55, 13, 2);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (14, 'Delivered', 49, 14, 7);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (15, 'Failed', 81, 15, 8);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (16, 'Failed', 76, 16, 3);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (17, 'Pending', 74, 17, 10);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (18, 'Picked Up', 32, 18, 4);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (19, 'Delivered', 19, 19, 6);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (20, 'Delivered', 42, 20, 7);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (21, 'Pending', 5, 21, 6);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (22, 'In Transit', 91, 22, 5);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (23, 'In Transit', 50, 23, 1);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (24, 'Pending', 71, 24, 3);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (25, 'Picked Up', 48, 25, 8);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (26, 'Picked Up', 73, 26, 1);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (27, 'Delivered', 58, 27, 3);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (28, 'Failed', 38, 28, 3);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (29, 'In Transit', 5, 29, 8);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (30, 'Picked Up', 51, 30, 6);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (31, 'Picked Up', 78, 31, 8);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (32, 'Delivered', 83, 32, 9);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (33, 'Delivered', 57, 33, 5);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (34, 'Picked Up', 4, 34, 5);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (35, 'Delivered', 100, 35, 2);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (36, 'Delivered', 66, 36, 2);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (37, 'Failed', 36, 37, 6);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (38, 'In Transit', 52, 38, 9);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (39, 'Pending', 1, 39, 8);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (40, 'Pending', 32, 40, 6);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (41, 'In Transit', 16, 41, 7);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (42, 'In Transit', 71, 42, 1);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (43, 'In Transit', 91, 43, 7);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (44, 'Failed', 84, 44, 8);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (45, 'Delivered', 11, 45, 3);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (46, 'Delivered', 86, 46, 3);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (47, 'Pending', 46, 47, 1);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (48, 'Picked Up', 14, 48, 6);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (49, 'Delivered', 62, 49, 1);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (50, 'Picked Up', 41, 50, 8);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (51, 'Failed', 98, 51, 2);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (52, 'In Transit', 35, 52, 3);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (53, 'Picked Up', 98, 53, 3);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (54, 'Picked Up', 83, 54, 1);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (55, 'Failed', 10, 55, 4);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (56, 'Delivered', 65, 56, 10);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (57, 'In Transit', 89, 57, 2);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (58, 'Picked Up', 33, 58, 10);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (59, 'Picked Up', 16, 59, 6);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (60, 'Delivered', 42, 60, 4);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (61, 'Picked Up', 65, 61, 1);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (62, 'Failed', 45, 62, 3);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (63, 'Failed', 11, 63, 2);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (64, 'Delivered', 56, 64, 4);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (65, 'Picked Up', 11, 65, 7);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (66, 'In Transit', 6, 66, 1);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (67, 'Picked Up', 40, 67, 2);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (68, 'Delivered', 74, 68, 9);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (69, 'Delivered', 29, 69, 10);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (70, 'In Transit', 3, 70, 2);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (71, 'Picked Up', 80, 71, 6);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (72, 'Delivered', 9, 72, 2);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (73, 'Picked Up', 12, 73, 10);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (74, 'Delivered', 27, 74, 6);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (75, 'In Transit', 14, 75, 3);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (76, 'Picked Up', 31, 76, 5);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (77, 'Delivered', 77, 77, 10);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (78, 'In Transit', 67, 78, 4);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (79, 'Delivered', 46, 79, 9);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (80, 'In Transit', 50, 80, 9);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (81, 'In Transit', 80, 81, 6);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (82, 'Delivered', 55, 82, 4);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (83, 'In Transit', 88, 83, 4);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (84, 'Delivered', 29, 84, 4);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (85, 'Pending', 81, 85, 4);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (86, 'Delivered', 91, 86, 4);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (87, 'In Transit', 51, 87, 2);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (88, 'Failed', 77, 88, 4);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (89, 'Picked Up', 17, 89, 8);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (90, 'Failed', 4, 90, 7);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (91, 'In Transit', 63, 91, 1);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (92, 'Delivered', 7, 92, 4);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (93, 'Picked Up', 76, 93, 5);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (94, 'Delivered', 68, 94, 2);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (95, 'In Transit', 71, 95, 8);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (96, 'Pending', 53, 96, 6);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (97, 'In Transit', 100, 97, 3);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (98, 'Pending', 77, 98, 5);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (99, 'In Transit', 55, 99, 10);
+INSERT INTO delivery (delivery_id, delivery_status, delivery_address_id, order_id, company_id) VALUES (100, 'Pending', 93, 100, 6);
+
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (1, 'Complaint', 'Aenean sit amet justo. Morbi ut odio.', 'Resolved', 76);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (2, 'Inquiry', 'Duis mattis egestas metus. Aenean fermentum.', 'Resolved', 54);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (3, 'Inquiry', 'Mauris ullamcorper purus sit amet nulla. Quisque arcu libero, rutrum ac, lobortis vel, dapibus at, diam.', 'Resolved', 87);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (4, 'Inquiry', 'Vestibulum ac est lacinia nisi venenatis tristique. Fusce congue, diam id ornare imperdiet, sapien urna pretium nisl, ut volutpat sapien arcu sed augue.', 'Resolved', 23);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (5, 'Complaint', 'Praesent id massa id nisl venenatis lacinia. Aenean sit amet justo.', 'Resolved', 29);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (6, 'Complaint', 'Fusce consequat. Nulla nisl.', 'Pending', 69);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (7, 'Inquiry', 'Vestibulum quam sapien, varius ut, blandit non, interdum in, ante. Vestibulum ante ipsum primis in faucibus orci luctus et ultrices posuere cubilia Curae; Duis faucibus accumsan odio.', 'Pending', 85);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (8, 'Complaint', 'Cras mi pede, malesuada in, imperdiet et, commodo vulputate, justo. In blandit ultrices enim.', 'Resolved', 72);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (9, 'Inquiry', 'Maecenas ut massa quis augue luctus tincidunt. Nulla mollis molestie lorem.', 'Resolved', 97);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (10, 'Complaint', 'Curabitur in libero ut massa volutpat convallis. Morbi odio odio, elementum eu, interdum eu, tincidunt in, leo.', 'Resolved', 70);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (11, 'Inquiry', 'Curabitur convallis. Duis consequat dui nec nisi volutpat eleifend.', 'Pending', 95);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (12, 'Inquiry', 'Nulla suscipit ligula in lacus. Curabitur at ipsum ac tellus semper interdum.', 'Resolved', 19);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (13, 'Inquiry', 'Morbi non lectus. Aliquam sit amet diam in magna bibendum imperdiet.', 'Pending', 98);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (14, 'Complaint', 'In quis justo. Maecenas rhoncus aliquam lacus.', 'Resolved', 50);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (15, 'Complaint', 'Nulla facilisi. Cras non velit nec nisi vulputate nonummy.', 'Resolved', 47);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (16, 'Complaint', 'Duis bibendum, felis sed interdum venenatis, turpis enim blandit mi, in porttitor pede justo eu massa. Donec dapibus.', 'Pending', 96);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (17, 'Inquiry', 'Morbi non lectus. Aliquam sit amet diam in magna bibendum imperdiet.', 'Resolved', 12);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (18, 'Complaint', 'Nulla neque libero, convallis eget, eleifend luctus, ultricies eu, nibh. Quisque id justo sit amet sapien dignissim vestibulum.', 'Pending', 26);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (19, 'Complaint', 'Nunc rhoncus dui vel sem. Sed sagittis.', 'Resolved', 39);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (20, 'Complaint', 'Duis mattis egestas metus. Aenean fermentum.', 'Resolved', 62);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (21, 'Complaint', 'Morbi ut odio. Cras mi pede, malesuada in, imperdiet et, commodo vulputate, justo.', 'Pending', 23);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (22, 'Inquiry', 'Cum sociis natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. Vivamus vestibulum sagittis sapien.', 'Pending', 48);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (23, 'Complaint', 'Aliquam quis turpis eget elit sodales scelerisque. Mauris sit amet eros.', 'Resolved', 78);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (24, 'Inquiry', 'Aliquam non mauris. Morbi non lectus.', 'Resolved', 43);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (25, 'Inquiry', 'Vestibulum ante ipsum primis in faucibus orci luctus et ultrices posuere cubilia Curae; Mauris viverra diam vitae quam. Suspendisse potenti.', 'Pending', 30);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (26, 'Inquiry', 'Nullam molestie nibh in lectus. Pellentesque at nulla.', 'Resolved', 9);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (27, 'Inquiry', 'Curabitur in libero ut massa volutpat convallis. Morbi odio odio, elementum eu, interdum eu, tincidunt in, leo.', 'Resolved', 77);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (28, 'Inquiry', 'Sed ante. Vivamus tortor.', 'Resolved', 31);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (29, 'Complaint', 'Proin risus. Praesent lectus.', 'Resolved', 55);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (30, 'Inquiry', 'Donec diam neque, vestibulum eget, vulputate ut, ultrices vel, augue. Vestibulum ante ipsum primis in faucibus orci luctus et ultrices posuere cubilia Curae; Donec pharetra, magna vestibulum aliquet ultrices, erat tortor sollicitudin mi, sit amet lobortis sapien sapien non mi.', 'Resolved', 56);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (31, 'Inquiry', 'Integer pede justo, lacinia eget, tincidunt eget, tempus vel, pede. Morbi porttitor lorem id ligula.', 'Resolved', 96);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (32, 'Inquiry', 'In est risus, auctor sed, tristique in, tempus sit amet, sem. Fusce consequat.', 'Resolved', 54);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (33, 'Inquiry', 'Etiam pretium iaculis justo. In hac habitasse platea dictumst.', 'Pending', 37);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (34, 'Inquiry', 'Pellentesque ultrices mattis odio. Donec vitae nisi.', 'Resolved', 3);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (35, 'Complaint', 'In hac habitasse platea dictumst. Maecenas ut massa quis augue luctus tincidunt.', 'Pending', 95);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (36, 'Complaint', 'Nam dui. Proin leo odio, porttitor id, consequat in, consequat ut, nulla.', 'Resolved', 90);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (37, 'Inquiry', 'Maecenas leo odio, condimentum id, luctus nec, molestie sed, justo. Pellentesque viverra pede ac diam.', 'Pending', 18);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (38, 'Complaint', 'Maecenas leo odio, condimentum id, luctus nec, molestie sed, justo. Pellentesque viverra pede ac diam.', 'Resolved', 58);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (39, 'Complaint', 'Phasellus in felis. Donec semper sapien a libero.', 'Resolved', 41);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (40, 'Complaint', 'Etiam vel augue. Vestibulum rutrum rutrum neque.', 'Pending', 43);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (41, 'Complaint', 'In tempor, turpis nec euismod scelerisque, quam turpis adipiscing lorem, vitae mattis nibh ligula nec sem. Duis aliquam convallis nunc.', 'Pending', 100);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (42, 'Inquiry', 'Etiam faucibus cursus urna. Ut tellus.', 'Resolved', 2);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (43, 'Inquiry', 'In blandit ultrices enim. Lorem ipsum dolor sit amet, consectetuer adipiscing elit.', 'Resolved', 35);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (44, 'Complaint', 'Vestibulum rutrum rutrum neque. Aenean auctor gravida sem.', 'Resolved', 3);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (45, 'Complaint', 'Cum sociis natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. Etiam vel augue.', 'Pending', 20);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (46, 'Complaint', 'Vestibulum ante ipsum primis in faucibus orci luctus et ultrices posuere cubilia Curae; Mauris viverra diam vitae quam. Suspendisse potenti.', 'Pending', 61);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (47, 'Inquiry', 'Donec quis orci eget orci vehicula condimentum. Curabitur in libero ut massa volutpat convallis.', 'Pending', 18);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (48, 'Complaint', 'Sed ante. Vivamus tortor.', 'Resolved', 11);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (49, 'Complaint', 'Integer ac neque. Duis bibendum.', 'Resolved', 80);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (50, 'Complaint', 'In hac habitasse platea dictumst. Morbi vestibulum, velit id pretium iaculis, diam erat fermentum justo, nec condimentum neque sapien placerat ante.', 'Resolved', 38);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (51, 'Complaint', 'Duis mattis egestas metus. Aenean fermentum.', 'Resolved', 97);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (52, 'Inquiry', 'Phasellus in felis. Donec semper sapien a libero.', 'Resolved', 46);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (53, 'Complaint', 'Nullam porttitor lacus at turpis. Donec posuere metus vitae ipsum.', 'Pending', 67);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (54, 'Complaint', 'Suspendisse ornare consequat lectus. In est risus, auctor sed, tristique in, tempus sit amet, sem.', 'Resolved', 6);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (55, 'Complaint', 'Curabitur at ipsum ac tellus semper interdum. Mauris ullamcorper purus sit amet nulla.', 'Resolved', 37);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (56, 'Inquiry', 'Curabitur at ipsum ac tellus semper interdum. Mauris ullamcorper purus sit amet nulla.', 'Resolved', 73);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (57, 'Complaint', 'Duis consequat dui nec nisi volutpat eleifend. Donec ut dolor.', 'Pending', 36);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (58, 'Inquiry', 'Maecenas tristique, est et tempus semper, est quam pharetra magna, ac consequat metus sapien ut nunc. Vestibulum ante ipsum primis in faucibus orci luctus et ultrices posuere cubilia Curae; Mauris viverra diam vitae quam.', 'Resolved', 24);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (59, 'Complaint', 'Pellentesque eget nunc. Donec quis orci eget orci vehicula condimentum.', 'Resolved', 72);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (60, 'Complaint', 'Curabitur convallis. Duis consequat dui nec nisi volutpat eleifend.', 'Resolved', 38);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (61, 'Complaint', 'Maecenas rhoncus aliquam lacus. Morbi quis tortor id nulla ultrices aliquet.', 'Resolved', 70);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (62, 'Inquiry', 'In sagittis dui vel nisl. Duis ac nibh.', 'Resolved', 68);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (63, 'Complaint', 'Cras non velit nec nisi vulputate nonummy. Maecenas tincidunt lacus at velit.', 'Pending', 97);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (64, 'Complaint', 'Curabitur at ipsum ac tellus semper interdum. Mauris ullamcorper purus sit amet nulla.', 'Pending', 1);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (65, 'Inquiry', 'Nulla justo. Aliquam quis turpis eget elit sodales scelerisque.', 'Resolved', 28);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (66, 'Complaint', 'Integer aliquet, massa id lobortis convallis, tortor risus dapibus augue, vel accumsan tellus nisi eu orci. Mauris lacinia sapien quis libero.', 'Pending', 56);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (67, 'Complaint', 'Nam congue, risus semper porta volutpat, quam pede lobortis ligula, sit amet eleifend pede libero quis orci. Nullam molestie nibh in lectus.', 'Resolved', 85);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (68, 'Complaint', 'Donec semper sapien a libero. Nam dui.', 'Resolved', 49);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (69, 'Complaint', 'Aenean auctor gravida sem. Praesent id massa id nisl venenatis lacinia.', 'Pending', 67);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (70, 'Inquiry', 'Aliquam sit amet diam in magna bibendum imperdiet. Nullam orci pede, venenatis non, sodales sed, tincidunt eu, felis.', 'Resolved', 44);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (71, 'Complaint', 'Quisque erat eros, viverra eget, congue eget, semper rutrum, nulla. Nunc purus.', 'Pending', 28);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (72, 'Inquiry', 'Vivamus in felis eu sapien cursus vestibulum. Proin eu mi.', 'Resolved', 91);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (73, 'Inquiry', 'Integer ac leo. Pellentesque ultrices mattis odio.', 'Resolved', 70);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (74, 'Inquiry', 'Nulla tempus. Vivamus in felis eu sapien cursus vestibulum.', 'Resolved', 56);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (75, 'Complaint', 'Donec diam neque, vestibulum eget, vulputate ut, ultrices vel, augue. Vestibulum ante ipsum primis in faucibus orci luctus et ultrices posuere cubilia Curae; Donec pharetra, magna vestibulum aliquet ultrices, erat tortor sollicitudin mi, sit amet lobortis sapien sapien non mi.', 'Resolved', 84);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (76, 'Inquiry', 'Nulla facilisi. Cras non velit nec nisi vulputate nonummy.', 'Resolved', 46);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (77, 'Inquiry', 'Nam dui. Proin leo odio, porttitor id, consequat in, consequat ut, nulla.', 'Resolved', 24);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (78, 'Complaint', 'In quis justo. Maecenas rhoncus aliquam lacus.', 'Pending', 59);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (79, 'Complaint', 'In hac habitasse platea dictumst. Aliquam augue quam, sollicitudin vitae, consectetuer eget, rutrum at, lorem.', 'Pending', 97);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (80, 'Complaint', 'Donec odio justo, sollicitudin ut, suscipit a, feugiat et, eros. Vestibulum ac est lacinia nisi venenatis tristique.', 'Resolved', 92);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (81, 'Inquiry', 'Cras non velit nec nisi vulputate nonummy. Maecenas tincidunt lacus at velit.', 'Resolved', 31);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (82, 'Complaint', 'Integer a nibh. In quis justo.', 'Pending', 41);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (83, 'Inquiry', 'Quisque ut erat. Curabitur gravida nisi at nibh.', 'Pending', 67);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (84, 'Complaint', 'Maecenas leo odio, condimentum id, luctus nec, molestie sed, justo. Pellentesque viverra pede ac diam.', 'Resolved', 56);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (85, 'Inquiry', 'Suspendisse potenti. Cras in purus eu magna vulputate luctus.', 'Pending', 51);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (86, 'Inquiry', 'Morbi odio odio, elementum eu, interdum eu, tincidunt in, leo. Maecenas pulvinar lobortis est.', 'Pending', 18);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (87, 'Complaint', 'Duis at velit eu est congue elementum. In hac habitasse platea dictumst.', 'Pending', 63);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (88, 'Inquiry', 'Aliquam erat volutpat. In congue.', 'Resolved', 88);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (89, 'Inquiry', 'Nulla ut erat id mauris vulputate elementum. Nullam varius.', 'Resolved', 46);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (90, 'Inquiry', 'Nam congue, risus semper porta volutpat, quam pede lobortis ligula, sit amet eleifend pede libero quis orci. Nullam molestie nibh in lectus.', 'Resolved', 14);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (91, 'Inquiry', 'Donec odio justo, sollicitudin ut, suscipit a, feugiat et, eros. Vestibulum ac est lacinia nisi venenatis tristique.', 'Pending', 93);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (92, 'Inquiry', 'Duis ac nibh. Fusce lacus purus, aliquet at, feugiat non, pretium quis, lectus.', 'Pending', 1);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (93, 'Complaint', 'Cum sociis natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. Etiam vel augue.', 'Resolved', 99);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (94, 'Inquiry', 'Vestibulum ante ipsum primis in faucibus orci luctus et ultrices posuere cubilia Curae; Duis faucibus accumsan odio. Curabitur convallis.', 'Pending', 89);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (95, 'Complaint', 'Maecenas pulvinar lobortis est. Phasellus sit amet erat.', 'Resolved', 55);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (96, 'Complaint', 'Praesent id massa id nisl venenatis lacinia. Aenean sit amet justo.', 'Resolved', 7);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (97, 'Inquiry', 'Duis bibendum, felis sed interdum venenatis, turpis enim blandit mi, in porttitor pede justo eu massa. Donec dapibus.', 'Resolved', 99);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (98, 'Inquiry', 'Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Proin interdum mauris non ligula pellentesque ultrices.', 'Resolved', 56);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (99, 'Complaint', 'In hac habitasse platea dictumst. Aliquam augue quam, sollicitudin vitae, consectetuer eget, rutrum at, lorem.', 'Pending', 44);
+INSERT INTO feedback (feedback_id, feedback_type, comments, status, order_id) VALUES (100, 'Inquiry', 'Aenean fermentum. Donec ut mauris eget massa tempor convallis.', 'Pending', 42);
+
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (1, 5, 4.7, 20, 8);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (2, 5, 62.7, 51, 5);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (3, 2, 46.64, 97, 33);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (4, 5, 16.64, 27, 30);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (5, 5, 56.03, 75, 27);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (6, 4, 32.6, 2, 25);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (7, 1, 54.66, 36, 25);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (8, 2, 41.08, 51, 9);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (9, 3, 20.88, 1, 37);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (10, 3, 34.75, 21, 15);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (11, 5, 64.74, 8, 12);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (12, 2, 25.31, 49, 11);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (13, 5, 57.26, 41, 30);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (14, 3, 53.21, 69, 22);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (15, 5, 66.97, 83, 39);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (16, 4, 44.34, 31, 31);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (17, 3, 46.99, 93, 4);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (18, 4, 20.9, 52, 7);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (19, 5, 38.27, 83, 18);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (20, 5, 65.45, 4, 35);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (21, 5, 68.0, 32, 4);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (22, 2, 63.46, 31, 8);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (23, 4, 26.18, 36, 30);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (24, 4, 68.79, 46, 23);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (25, 1, 11.66, 33, 28);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (26, 3, 49.41, 55, 20);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (27, 2, 33.24, 100, 18);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (28, 3, 46.75, 7, 10);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (29, 3, 19.75, 30, 30);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (30, 3, 36.45, 68, 6);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (31, 2, 8.52, 21, 15);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (32, 2, 45.38, 29, 3);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (33, 2, 60.65, 69, 30);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (34, 4, 24.77, 10, 23);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (35, 5, 66.2, 61, 19);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (36, 4, 43.3, 21, 38);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (37, 2, 56.07, 38, 15);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (38, 2, 28.06, 11, 25);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (39, 4, 27.72, 87, 6);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (40, 2, 61.0, 93, 8);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (41, 2, 67.67, 71, 16);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (42, 1, 13.0, 23, 17);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (43, 4, 58.11, 91, 14);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (44, 5, 4.85, 11, 35);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (45, 3, 43.36, 64, 30);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (46, 3, 54.42, 59, 6);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (47, 5, 64.48, 17, 17);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (48, 1, 44.1, 19, 12);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (49, 3, 58.38, 72, 14);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (50, 3, 28.78, 20, 28);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (51, 5, 44.74, 64, 26);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (52, 2, 21.36, 92, 22);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (53, 4, 58.43, 19, 2);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (54, 3, 50.24, 92, 33);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (55, 2, 21.43, 52, 22);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (56, 1, 66.59, 46, 17);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (57, 3, 43.68, 41, 15);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (58, 1, 11.91, 20, 23);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (59, 1, 8.49, 25, 3);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (60, 3, 55.59, 68, 18);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (61, 1, 34.73, 50, 23);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (62, 5, 30.92, 33, 14);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (63, 4, 40.57, 49, 31);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (64, 5, 30.21, 67, 6);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (65, 4, 22.03, 76, 5);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (66, 1, 69.38, 51, 12);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (67, 2, 22.74, 32, 5);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (68, 2, 50.66, 10, 7);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (69, 2, 23.46, 92, 21);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (70, 1, 68.8, 75, 25);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (71, 5, 50.48, 11, 36);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (72, 2, 12.79, 36, 36);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (73, 5, 52.19, 100, 5);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (74, 5, 50.94, 68, 19);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (75, 2, 62.22, 7, 1);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (76, 3, 22.34, 35, 17);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (77, 1, 43.19, 35, 33);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (78, 5, 36.96, 57, 11);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (79, 2, 69.13, 65, 4);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (80, 2, 6.87, 12, 12);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (81, 2, 43.62, 45, 37);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (82, 3, 53.56, 93, 6);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (83, 5, 63.14, 46, 9);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (84, 1, 6.83, 38, 38);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (85, 1, 10.44, 32, 35);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (86, 4, 36.63, 2, 28);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (87, 4, 4.96, 45, 22);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (88, 4, 54.35, 10, 19);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (89, 4, 49.5, 99, 27);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (90, 5, 35.2, 75, 23);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (91, 4, 68.48, 92, 25);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (92, 4, 36.93, 14, 21);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (93, 4, 10.97, 13, 6);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (94, 2, 21.1, 14, 18);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (95, 5, 53.92, 64, 11);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (96, 3, 15.41, 78, 8);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (97, 2, 34.55, 27, 11);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (98, 4, 66.78, 55, 36);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (99, 5, 7.2, 8, 32);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (100, 3, 17.56, 62, 27);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (101, 4, 19.03, 23, 21);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (102, 4, 38.11, 13, 7);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (103, 3, 62.95, 52, 20);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (104, 3, 56.2, 51, 9);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (105, 4, 18.82, 50, 5);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (106, 1, 44.22, 10, 13);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (107, 1, 10.76, 50, 3);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (108, 1, 53.06, 51, 27);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (109, 2, 28.15, 58, 14);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (110, 2, 39.73, 11, 20);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (111, 4, 63.75, 88, 25);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (112, 4, 25.09, 75, 5);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (113, 3, 29.91, 40, 19);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (114, 4, 11.66, 15, 16);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (115, 2, 50.03, 30, 10);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (116, 1, 46.94, 17, 4);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (117, 4, 3.55, 66, 6);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (118, 5, 9.46, 27, 32);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (119, 4, 34.43, 8, 10);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (120, 5, 38.61, 66, 23);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (121, 1, 45.64, 50, 9);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (122, 1, 27.53, 35, 20);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (123, 2, 44.14, 12, 25);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (124, 2, 7.98, 47, 36);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (125, 4, 46.22, 90, 33);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (126, 2, 60.93, 79, 34);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (127, 2, 37.16, 90, 17);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (128, 1, 5.66, 47, 8);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (129, 5, 38.85, 38, 26);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (130, 2, 47.91, 69, 1);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (131, 1, 53.34, 79, 39);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (132, 1, 27.56, 34, 36);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (133, 1, 58.64, 42, 12);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (134, 1, 27.24, 93, 12);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (135, 4, 58.5, 97, 22);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (136, 1, 19.36, 14, 26);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (137, 3, 38.91, 35, 23);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (138, 3, 20.2, 45, 29);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (139, 5, 17.64, 45, 30);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (140, 5, 60.47, 56, 3);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (141, 5, 53.36, 42, 40);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (142, 5, 60.85, 30, 27);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (143, 5, 27.84, 79, 13);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (144, 4, 26.08, 80, 28);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (145, 4, 30.23, 41, 12);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (146, 2, 37.01, 31, 19);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (147, 2, 31.75, 11, 3);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (148, 1, 20.19, 63, 33);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (149, 3, 42.51, 31, 29);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (150, 2, 39.89, 69, 30);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (151, 1, 35.74, 6, 11);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (152, 2, 26.38, 23, 17);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (153, 1, 3.94, 33, 24);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (154, 2, 27.24, 69, 38);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (155, 2, 16.37, 10, 35);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (156, 5, 22.35, 63, 30);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (157, 3, 52.45, 40, 16);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (158, 3, 53.02, 87, 8);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (159, 4, 65.9, 97, 9);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (160, 3, 58.75, 30, 36);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (161, 5, 45.76, 14, 40);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (162, 5, 53.88, 87, 24);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (163, 5, 46.71, 74, 9);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (164, 1, 8.18, 54, 40);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (165, 4, 19.53, 79, 37);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (166, 4, 44.58, 41, 32);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (167, 1, 22.55, 99, 3);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (168, 1, 30.11, 76, 10);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (169, 1, 41.27, 60, 10);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (170, 4, 39.65, 66, 2);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (171, 4, 5.85, 97, 21);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (172, 2, 23.3, 95, 39);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (173, 3, 32.54, 28, 1);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (174, 1, 42.38, 47, 18);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (175, 1, 8.17, 88, 28);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (176, 2, 51.5, 42, 14);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (177, 4, 31.67, 92, 38);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (178, 1, 15.04, 10, 24);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (179, 5, 35.23, 59, 31);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (180, 2, 53.84, 12, 13);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (181, 3, 9.94, 30, 5);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (182, 3, 18.36, 62, 33);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (183, 1, 59.43, 96, 23);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (184, 3, 69.33, 24, 37);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (185, 1, 56.98, 99, 23);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (186, 4, 51.11, 44, 8);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (187, 4, 69.79, 46, 4);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (188, 1, 60.37, 88, 17);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (189, 3, 44.44, 68, 9);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (190, 2, 68.3, 76, 38);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (191, 1, 5.91, 47, 23);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (192, 4, 39.66, 71, 39);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (193, 3, 50.04, 34, 11);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (194, 2, 24.25, 66, 34);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (195, 2, 20.33, 68, 9);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (196, 2, 57.61, 100, 40);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (197, 2, 25.6, 44, 27);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (198, 5, 68.08, 55, 38);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (199, 3, 54.8, 39, 11);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (200, 4, 37.01, 87, 28);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (201, 2, 49.91, 50, 18);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (202, 3, 44.81, 85, 7);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (203, 2, 48.14, 81, 5);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (204, 1, 36.19, 48, 37);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (205, 5, 64.16, 49, 22);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (206, 2, 32.08, 57, 8);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (207, 1, 47.81, 76, 3);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (208, 5, 9.58, 3, 40);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (209, 3, 54.14, 92, 33);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (210, 3, 40.47, 2, 6);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (211, 4, 45.63, 24, 16);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (212, 2, 28.91, 75, 19);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (213, 2, 5.48, 45, 5);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (214, 5, 65.64, 14, 20);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (215, 3, 11.42, 67, 6);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (216, 4, 60.32, 9, 38);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (217, 1, 58.76, 37, 26);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (218, 4, 29.97, 94, 39);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (219, 1, 9.76, 23, 35);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (220, 2, 22.38, 47, 3);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (221, 1, 52.85, 91, 20);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (222, 2, 65.1, 46, 9);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (223, 2, 14.74, 80, 31);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (224, 3, 42.49, 100, 6);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (225, 2, 32.15, 56, 20);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (226, 1, 13.11, 25, 23);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (227, 2, 64.15, 33, 19);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (228, 3, 36.32, 1, 6);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (229, 1, 32.24, 25, 28);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (230, 4, 38.79, 57, 23);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (231, 5, 43.86, 68, 38);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (232, 2, 36.41, 30, 4);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (233, 5, 69.96, 84, 20);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (234, 5, 21.49, 80, 37);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (235, 1, 27.75, 66, 12);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (236, 5, 18.17, 1, 32);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (237, 4, 57.24, 24, 26);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (238, 3, 66.2, 95, 4);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (239, 2, 42.8, 65, 18);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (240, 1, 51.18, 58, 27);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (241, 4, 65.73, 18, 36);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (242, 3, 59.06, 98, 5);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (243, 4, 26.3, 44, 35);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (244, 1, 58.89, 79, 36);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (245, 2, 7.01, 35, 30);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (246, 1, 44.45, 93, 24);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (247, 5, 30.81, 10, 6);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (248, 2, 4.49, 25, 12);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (249, 1, 5.17, 43, 27);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (250, 3, 49.6, 62, 18);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (251, 5, 65.35, 91, 3);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (252, 3, 26.8, 20, 35);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (253, 1, 55.14, 62, 12);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (254, 5, 14.47, 41, 11);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (255, 5, 52.83, 19, 14);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (256, 4, 68.98, 76, 25);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (257, 5, 6.01, 71, 39);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (258, 1, 26.87, 45, 31);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (259, 1, 35.23, 51, 35);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (260, 2, 66.05, 72, 32);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (261, 4, 43.19, 7, 26);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (262, 3, 22.72, 51, 34);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (263, 2, 25.41, 34, 9);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (264, 2, 63.98, 96, 34);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (265, 5, 59.87, 4, 39);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (266, 1, 19.06, 22, 6);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (267, 5, 48.34, 29, 12);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (268, 1, 48.33, 72, 32);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (269, 5, 41.72, 94, 1);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (270, 4, 63.23, 26, 8);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (271, 1, 14.88, 55, 18);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (272, 3, 16.77, 34, 19);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (273, 2, 47.17, 94, 4);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (274, 4, 60.4, 91, 16);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (275, 5, 65.86, 38, 29);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (276, 4, 28.42, 57, 20);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (277, 4, 63.69, 15, 1);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (278, 4, 21.82, 86, 1);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (279, 4, 42.82, 77, 28);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (280, 5, 57.34, 64, 20);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (281, 3, 41.66, 53, 15);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (282, 2, 38.87, 7, 18);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (283, 2, 54.22, 10, 10);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (284, 1, 19.66, 71, 10);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (285, 1, 17.67, 53, 24);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (286, 5, 49.57, 82, 38);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (287, 5, 33.14, 22, 3);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (288, 1, 6.46, 47, 32);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (289, 4, 19.71, 60, 7);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (290, 1, 45.14, 62, 39);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (291, 4, 58.96, 42, 24);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (292, 4, 9.77, 80, 21);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (293, 1, 31.31, 88, 10);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (294, 3, 10.89, 99, 39);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (295, 4, 33.9, 47, 13);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (296, 2, 41.48, 54, 20);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (297, 5, 57.18, 10, 5);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (298, 2, 53.22, 25, 40);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (299, 1, 63.49, 11, 34);
+INSERT INTO order_details (order_detail_id, quantity, subtotal, order_id, menu_id) VALUES (300, 4, 27.09, 12, 30);
+
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (1, '25-Mar-2024', 10, 'Applied', 1, 6, 1);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (2, '10-Jan-2023', 3, 'Pending', 2, 5, 4);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (3, '08-Feb-2023', 10, 'Applied', 3, 2, 1);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (4, '21-Nov-2023', 5, 'Pending', 4, 4, 4);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (5, '10-Nov-2023', 5, 'Pending', 5, 10, 5);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (6, '03-Aug-2024', 10, 'Applied', 6, 2, 2);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (7, '13-Jul-2024', 10, 'Pending', 7, 6, 6);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (8, '11-Mar-2024', 3, 'Applied', 8, 9, 7);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (9, '12-Aug-2024', 5, 'Applied', 9, 3, 2);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (10, '19-Oct-2022', 3, 'Applied', 10, 9, 8);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (11, '26-Sep-2023', 10, 'Applied', 11, 8, 8);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (12, '14-Feb-2024', 10, 'Applied', 12, 10, 4);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (13, '12-Jun-2024', 15, 'Applied', 13, 8, 1);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (14, '21-Apr-2022', 10, 'Applied', 14, 6, 4);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (15, '18-Jan-2023', 10, 'Applied', 15, 4, 10);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (16, '10-Sep-2023', 10, 'Applied', 16, 4, 5);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (17, '29-Apr-2024', 2, 'Pending', 17, 6, 6);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (18, '04-Jan-2022', 10, 'Applied', 18, 10, 6);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (19, '10-Jun-2023', 2, 'Applied', 19, 10, 5);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (20, '18-Jun-2023', 15, 'Applied', 20, 3, 10);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (21, '23-Apr-2023', 3, 'Failed', 21, 10, 7);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (22, '17-Apr-2024', 2, 'Pending', 22, 8, 7);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (23, '31-May-2024', 3, 'Applied', 23, 7, 9);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (24, '01-Oct-2024', 10, 'Applied', 24, 3, 6);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (25, '30-Sep-2022', 2, 'Pending', 25, 2, 4);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (26, '10-Mar-2024', 5, 'Applied', 26, 5, 3);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (27, '29-Nov-2024', 3, 'Applied', 27, 1, 9);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (28, '25-Sep-2022', 15, 'Applied', 28, 5, 4);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (29, '27-Apr-2024', 10, 'Failed', 29, 4, 8);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (30, '15-Jan-2024', 15, 'Failed', 30, 3, 10);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (31, '23-Aug-2023', 5, 'Failed', 31, 2, 3);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (32, '13-Jun-2022', 2, 'Pending', 32, 5, 10);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (33, '23-Jun-2022', 2, 'Pending', 33, 3, 6);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (34, '05-Oct-2022', 2, 'Applied', 34, 1, 10);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (35, '16-Sep-2024', 2, 'Applied', 35, 8, 1);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (36, '06-Jan-2023', 3, 'Failed', 36, 8, 10);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (37, '06-Apr-2022', 5, 'Applied', 37, 5, 1);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (38, '07-Aug-2023', 15, 'Applied', 38, 2, 4);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (39, '21-Jul-2024', 10, 'Applied', 39, 3, 3);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (40, '28-Jun-2023', 15, 'Applied', 40, 2, 10);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (41, '06-Oct-2022', 15, 'Applied', 41, 5, 7);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (42, '11-Feb-2024', 15, 'Applied', 42, 10, 2);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (43, '28-May-2024', 2, 'Applied', 43, 4, 2);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (44, '21-Feb-2024', 10, 'Applied', 44, 8, 9);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (45, '16-Jun-2023', 3, 'Applied', 45, 1, 10);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (46, '15-Jan-2023', 5, 'Applied', 46, 10, 2);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (47, '18-Dec-2023', 10, 'Applied', 47, 2, 8);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (48, '21-Apr-2022', 10, 'Failed', 48, 8, 6);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (49, '18-Sep-2022', 10, 'Pending', 49, 4, 9);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (50, '21-Jul-2023', 2, 'Pending', 50, 7, 9);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (51, '05-Sep-2023', 15, 'Applied', 51, 7, 1);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (52, '27-Jan-2023', 3, 'Pending', 52, 7, 5);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (53, '27-Sep-2023', 10, 'Failed', 53, 3, 3);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (54, '08-Jun-2024', 2, 'Pending', 54, 7, 10);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (55, '12-Nov-2023', 5, 'Applied', 55, 5, 8);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (56, '12-Apr-2022', 15, 'Applied', 56, 4, 9);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (57, '20-May-2023', 5, 'Applied', 57, 4, 5);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (58, '09-Oct-2022', 5, 'Applied', 58, 5, 5);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (59, '22-Nov-2023', 2, 'Applied', 59, 7, 6);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (60, '05-Mar-2022', 15, 'Failed', 60, 6, 9);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (61, '28-Nov-2024', 15, 'Failed', 61, 9, 3);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (62, '31-Aug-2023', 15, 'Applied', 62, 7, 3);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (63, '19-Oct-2024', 15, 'Pending', 63, 8, 5);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (64, '12-Oct-2022', 15, 'Applied', 64, 2, 4);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (65, '28-Feb-2023', 15, 'Applied', 65, 10, 3);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (66, '24-Apr-2024', 5, 'Applied', 66, 4, 10);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (67, '21-May-2022', 10, 'Applied', 67, 8, 1);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (68, '09-Jul-2023', 15, 'Applied', 68, 10, 9);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (69, '08-Feb-2022', 10, 'Pending', 69, 3, 7);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (70, '13-Mar-2023', 10, 'Pending', 70, 9, 2);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (71, '15-Mar-2023', 15, 'Pending', 71, 3, 5);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (72, '05-Sep-2023', 10, 'Applied', 72, 10, 9);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (73, '09-Sep-2022', 5, 'Applied', 73, 9, 9);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (74, '25-Dec-2023', 3, 'Failed', 74, 10, 7);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (75, '17-Jun-2022', 15, 'Applied', 75, 6, 3);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (76, '12-Jan-2023', 15, 'Applied', 76, 2, 1);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (77, '07-May-2022', 5, 'Pending', 77, 3, 4);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (78, '30-Oct-2023', 10, 'Applied', 78, 7, 7);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (79, '01-Aug-2022', 15, 'Failed', 79, 7, 6);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (80, '06-Apr-2024', 10, 'Applied', 80, 8, 5);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (81, '06-Mar-2023', 3, 'Pending', 81, 9, 10);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (82, '24-Apr-2024', 5, 'Applied', 82, 3, 1);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (83, '07-Feb-2023', 5, 'Pending', 83, 3, 5);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (84, '06-Aug-2023', 3, 'Failed', 84, 8, 5);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (85, '28-Nov-2022', 10, 'Applied', 85, 2, 3);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (86, '17-Jul-2023', 15, 'Applied', 86, 1, 10);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (87, '08-May-2023', 15, 'Applied', 87, 8, 5);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (88, '23-Jun-2022', 15, 'Applied', 88, 2, 10);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (89, '15-Apr-2023', 2, 'Applied', 89, 3, 8);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (90, '10-Aug-2022', 15, 'Applied', 90, 4, 5);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (91, '09-May-2023', 10, 'Applied', 91, 8, 8);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (92, '10-Jan-2023', 10, 'Applied', 92, 10, 9);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (93, '09-Jul-2022', 10, 'Applied', 93, 1, 4);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (94, '04-Feb-2022', 15, 'Applied', 94, 1, 3);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (95, '17-May-2023', 2, 'Applied', 95, 8, 3);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (96, '18-Feb-2023', 5, 'Applied', 96, 2, 6);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (97, '05-Nov-2022', 10, 'Pending', 97, 2, 2);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (98, '22-Jul-2024', 15, 'Applied', 98, 8, 9);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (99, '13-Sep-2022', 3, 'Applied', 99, 8, 5);
+INSERT INTO voucher_redemption (redemption_id, redeemed_at, discount_applied, status, order_id, voucher_id, member_id) VALUES (100, '20-Feb-2024', 15, 'Applied', 100, 1, 7);
+
+SELECT COUNT(*) FROM membership_type;
+SELECT COUNT(*) FROM member;
+SELECT COUNT(*) FROM menu;
+SELECT COUNT(*) FROM payments;
+SELECT COUNT(*) FROM order_details;
+SELECT COUNT(*) FROM voucher;
+SELECT COUNT(*) FROM orders;
+SELECT COUNT(*) FROM payments;
+SELECT COUNT(*) FROM delivery_address;
+SELECT COUNT(*) FROM delivery_company;
+SELECT COUNT(*) FROM restaurants;
+SELECT COUNT(*) FROM feedback;
+SELECT COUNT(*) FROM voucher_redemptions;
