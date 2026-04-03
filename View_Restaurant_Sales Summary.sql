@@ -20,13 +20,13 @@ GROUP BY
 SET LINESIZE 180
 SET PAGESIZE 100
 
-COLUMN restaurant_id           FORMAT 999
+COLUMN restaurant_id           FORMAT 990
 COLUMN restaurant_name         FORMAT A25
 COLUMN category                FORMAT A10
-COLUMN rating                  FORMAT 9.9
-COLUMN total_delivered_orders  FORMAT 999
-COLUMN total_revenue           FORMAT 99999.99
-COLUMN avg_order_value         FORMAT 99999.99
+COLUMN rating                  FORMAT 0.0
+COLUMN total_delivered_orders  FORMAT 990
+COLUMN total_revenue           FORMAT 99990.90
+COLUMN avg_order_value         FORMAT 99990.90
 
 TTITLE LEFT '				RESTAURANT SALES SUMMARY REPORT'
 
