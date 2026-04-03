@@ -30,5 +30,7 @@ BEGIN
 
     CLOSE c_orders;
 END;
-Run procedure:
+/
+
+-- Run procedure:
 EXEC sp_get_member_orders(1);

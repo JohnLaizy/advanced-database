@@ -51,5 +51,4 @@ EXCEPTION
         RAISE_APPLICATION_ERROR(-20016, 'Error during bulk price update: ' || SQLERRM);
 END;
 /
-
-EXEC pr_bulk_update_menu_price(3, 10); -- Increase the price of all menu items in restaurant with ID 3 by 10%
+EXEC pr_bulk_update_menu_price(3, 10);
