@@ -41,6 +41,8 @@ BEGIN
             'RM' || TO_CHAR(r_rest.avg_order_value, '99990.90')
         );
     END LOOP;
+    DBMS_OUTPUT.PUT_LINE(RPAD('-', 90, '-'));
+    DBMS_OUTPUT.PUT_LINE(LPAD('GRAND TOTAL REVENUE: RM' || TO_CHAR(v_grand_total, '999,990.90'), 90));
     DBMS_OUTPUT.PUT_LINE(RPAD('=', 90, '='));
 END;
 /

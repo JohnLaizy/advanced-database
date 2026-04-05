@@ -46,6 +46,8 @@ BEGIN
 END;
 /
 
+
+
 SET SERVEROUTPUT ON;
 SET LINESIZE 150;
 EXEC rpt_member_summary;
